@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1786264101610,
+      "tag": "0000_volatile_ultimo",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786264200000,
+      "tag": "0001_add_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786264300000,
+      "tag": "0002_schema_additions",
+      "breakpoints": true
+    }
+  ]
+}

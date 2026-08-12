@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database
+/.data
+
+# secrets (Docker build inputs — never commit)
+turso_auth_token
+turso_auth_token.txt
+google_api_key
+google_api_key.txt

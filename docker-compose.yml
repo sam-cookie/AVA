@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    image: expense-tracker
+    ports:
+      - "3001:3000"
+    env_file:
+      - .env.local
+    volumes:
+      - db_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  db_data:
