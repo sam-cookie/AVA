@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { getFundsWithBalances, getTotalBalance } from '@/services/funds'
 import { getTransactions } from '@/services/transactions'
 import { getCategories } from '@/services/categories'

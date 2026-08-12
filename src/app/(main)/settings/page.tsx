@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { getCategories } from '@/services/categories'
 import { getAllSources } from '@/services/sources'
 import { ManageCategories } from '@/components/categories/manage-categories'

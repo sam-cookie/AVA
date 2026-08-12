@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { getAllUtang } from '@/services/utang'
 import { getFundsWithBalances } from '@/services/funds'
 import { formatPHP } from '@/lib/utils/currency'

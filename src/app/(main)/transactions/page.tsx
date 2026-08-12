@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { Suspense } from 'react'
 import { getFundsWithBalances } from '@/services/funds'
 import { getTransactions } from '@/services/transactions'
