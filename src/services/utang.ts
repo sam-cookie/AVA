@@ -3,7 +3,7 @@ import { ensureInitialized } from '@/lib/db/init'
 ensureInitialized()
 import { utang, utangPayments, funds, transactions } from '@/lib/db/schema'
 import { eq, desc, sql, inArray } from 'drizzle-orm'
-import type { ServiceResult, UtangWithProgress, UtangStatus } from '@/types'
+import type { ServiceResult, UtangWithProgress, UtangStatus, UtangType } from '@/types'
 import { toCentavos, formatPHP } from '@/lib/utils/currency'
 import { getFundBalance } from './funds'
 
@@ -11,6 +11,42 @@ function deriveStatus(totalPaid: number, amount: number): UtangStatus {
   if (totalPaid <= 0) return 'unpaid'
   if (totalPaid >= amount) return 'paid'
   return 'partial'
+}
+
+export async function getUtangDeadlinesForMonth(
+  year: number,
+  month: number
+): Promise<{ id: number; person: string; type: UtangType; amount: number; remaining: number; deadline: string }[]> {
+  const monthStr = `${year}-${String(month).padStart(2, '0')}`
+  const rows = await db
+    .select()
+    .from(utang)
+    .where(sql`strftime('%Y-%m', ${utang.deadline}) = ${monthStr}`)
+
+  if (rows.length === 0) return []
+
+  const utangIds = rows.map((u) => u.id)
+  const totals = await db
+    .select({
+      utangId: utangPayments.utangId,
+      total: sql<number>`COALESCE(SUM(${utangPayments.amount}), 0)`,
+    })
+    .from(utangPayments)
+    .where(inArray(utangPayments.utangId, utangIds))
+    .groupBy(utangPayments.utangId)
+
+  const totalMap = new Map(totals.map((t) => [t.utangId, t.total]))
+
+  return rows
+    .map((u) => ({
+      id: u.id,
+      person: u.person,
+      type: u.type,
+      amount: u.amount,
+      remaining: Math.max(0, u.amount - (totalMap.get(u.id) ?? 0)),
+      deadline: u.deadline!,
+    }))
+    .filter((u) => u.remaining > 0)
 }
 
 export async function getAllUtang(): Promise<UtangWithProgress[]> {

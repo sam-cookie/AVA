@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic'
 
 import { getFundsWithBalances } from '@/services/funds'
 import { getTransactions } from '@/services/transactions'

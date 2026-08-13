@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Receipt, CreditCard, Settings, BarChart3, PanelLeftClose, PanelLeft, Target, Banknote, LogOut } from 'lucide-react'
+import { Home, Receipt, CreditCard, Settings, BarChart3, PanelLeftClose, PanelLeft, Target, Banknote, LogOut, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logoutAction } from '@/actions/auth'
 
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: '/funds', label: 'Accounts', icon: CreditCard },
   { href: '/savings', label: 'Savings', icon: Target },
   { href: '/utang', label: 'Utang', icon: Banknote },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]

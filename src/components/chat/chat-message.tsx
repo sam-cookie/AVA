@@ -10,46 +10,69 @@ function toolLabel(name: string): string {
 }
 
 function renderInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*\n]+\*\*)/)
+  // Split on bold, italic, and inline code tokens
+  const parts = text.split(/(`[^`]+`|\*\*[^*\n]+\*\*|\*[^*\n]+\*|_[^_\n]+_)/)
   if (parts.length === 1) return text
-  return parts.map((part, i) =>
-    part.startsWith('**') && part.endsWith('**')
-      ? <strong key={i}>{part.slice(2, -2)}</strong>
-      : part
-  )
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) return <strong key={i}>{part.slice(2, -2)}</strong>
+    if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) return <em key={i}>{part.slice(1, -1)}</em>
+    if (part.startsWith('`') && part.endsWith('`')) return <code key={i} className="bg-muted/80 rounded px-1 py-px font-mono text-[11.5px]">{part.slice(1, -1)}</code>
+    return part
+  })
 }
 
 function MarkdownText({ content }: { content: string }) {
   const lines = content.split('\n')
   const elements: React.ReactNode[] = []
-  let bulletItems: React.ReactNode[] = []
+  let listItems: React.ReactNode[] = []
+  let listType: 'ul' | 'ol' = 'ul'
   let k = 0
 
-  const flushBullets = () => {
-    if (bulletItems.length > 0) {
-      elements.push(
-        <ul key={k++} className="list-disc pl-4 space-y-0.5 my-1">
-          {bulletItems}
-        </ul>
-      )
-      bulletItems = []
-    }
+  const flushList = () => {
+    if (listItems.length === 0) return
+    const Tag = listType
+    elements.push(
+      <Tag key={k++} className={`${listType === 'ol' ? 'list-decimal' : 'list-disc'} pl-4 space-y-0.5 my-1`}>
+        {listItems}
+      </Tag>
+    )
+    listItems = []
   }
 
   for (const line of lines) {
+    const heading = line.match(/^(#{1,3}) (.+)/)
     const bullet = line.match(/^[*-] (.+)/)
-    if (bullet) {
-      bulletItems.push(<li key={k++}>{renderInline(bullet[1])}</li>)
+    const numbered = line.match(/^\d+\. (.+)/)
+
+    if (heading) {
+      flushList()
+      const level = heading[1].length
+      const cls = level === 1
+        ? 'block font-bold text-[14px] mt-2 mb-0.5'
+        : level === 2
+        ? 'block font-semibold text-[13.5px] mt-2 mb-0.5'
+        : 'block font-semibold text-[13px] mt-1.5 mb-0.5 text-foreground/80'
+      elements.push(<span key={k++} className={cls}>{renderInline(heading[2])}</span>)
+    } else if (bullet) {
+      if (listType !== 'ul' && listItems.length > 0) flushList()
+      listType = 'ul'
+      listItems.push(<li key={k++}>{renderInline(bullet[1])}</li>)
+    } else if (numbered) {
+      if (listType !== 'ol' && listItems.length > 0) flushList()
+      listType = 'ol'
+      listItems.push(<li key={k++}>{renderInline(numbered[1])}</li>)
     } else {
-      flushBullets()
-      if (line !== '') {
+      flushList()
+      if (line.trim() === '---' || line.trim() === '***') {
+        elements.push(<hr key={k++} className="border-border/40 my-2" />)
+      } else if (line !== '') {
         elements.push(<span key={k++} className="block">{renderInline(line)}</span>)
       } else {
         elements.push(<span key={k++} className="block h-2" />)
       }
     }
   }
-  flushBullets()
+  flushList()
 
   return <>{elements}</>
 }

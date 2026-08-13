@@ -325,6 +325,27 @@ export async function getExpensesByCategoryWithIcon(
   }))
 }
 
+/** Daily expense totals for a specific month, grouped by date */
+export async function getDailyExpensesForMonth(
+  year: number,
+  month: number
+): Promise<{ date: string; total: number; count: number }[]> {
+  const monthStr = `${year}-${String(month).padStart(2, '0')}`
+  const result = await client.execute({
+    sql: `SELECT date, SUM(amount) as total, COUNT(*) as count
+          FROM transactions
+          WHERE type = 'expense' AND strftime('%Y-%m', date) = ?
+          GROUP BY date
+          ORDER BY date ASC`,
+    args: [monthStr],
+  })
+  return result.rows.map((r) => ({
+    date: r.date as string,
+    total: r.total as number,
+    count: r.count as number,
+  }))
+}
+
 /** All-time total of expenses */
 export async function getTotalExpenses(): Promise<number> {
   const result = await client.execute({

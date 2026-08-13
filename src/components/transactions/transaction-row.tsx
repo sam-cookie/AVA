@@ -120,7 +120,7 @@ export function TransactionRow({ tx, showFund = false, hideDate = false, categor
 
         {(canEdit || canDelete) && (
           <DropdownMenu>
-            <DropdownMenuTrigger className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground/35 hover:text-foreground hover:bg-muted transition-colors shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100">
+            <DropdownMenuTrigger className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground/35 hover:text-foreground hover:bg-muted transition-colors shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100">
               <MoreHorizontal className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
