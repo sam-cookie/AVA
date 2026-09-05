@@ -122,6 +122,8 @@ export type Utang = {
   amount: number // centavos, original amount
   deadline: string | null // YYYY-MM-DD
   note: string | null
+  fundId?: number | null
+  transactionId?: number | null
   createdAt: Date
 }
 

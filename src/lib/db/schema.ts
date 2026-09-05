@@ -93,6 +93,10 @@ export const utang = sqliteTable('utang', {
   amount: integer('amount').notNull(), // centavos, original amount
   deadline: text('deadline'), // YYYY-MM-DD, nullable
   note: text('note'),
+  fundId: integer('fund_id')
+    .references(() => funds.id),
+  transactionId: integer('transaction_id')
+    .references(() => transactions.id, { onDelete: 'cascade' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 

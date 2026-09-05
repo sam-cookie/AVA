@@ -20,6 +20,7 @@ export const utangSchema = z.object({
   amount: amountField,
   deadline: dateField.optional().or(z.literal('')).optional(),
   note: z.string().max(200).optional(),
+  fundId: z.number().int().positive().optional(),
 })
 
 export const utangPaymentSchema = z.object({

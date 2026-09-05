@@ -17,11 +17,12 @@ export async function createUtangAction(formData: unknown): Promise<ServiceResul
     return { success: false, error: parsed.error.issues[0].message }
   }
 
-  const { type, person, amount, deadline, note } = parsed.data
+  const { type, person, amount, deadline, note, fundId } = parsed.data
   const result = await createUtang({
     type,
     person,
     amountRaw: amount,
+    fundId: fundId || undefined,
     deadline: deadline || undefined,
     note: note || undefined,
   })
@@ -40,12 +41,13 @@ export async function updateUtangAction(
     return { success: false, error: parsed.error.issues[0].message }
   }
 
-  const { person, amount, deadline, note } = parsed.data
+  const { person, amount, deadline, note, fundId } = parsed.data
   const result = await updateUtang(utangId, {
     person,
     amountRaw: amount,
     deadline: deadline || null,
     note: note || null,
+    fundId: fundId || null,
   })
 
   if (!result.success) return result

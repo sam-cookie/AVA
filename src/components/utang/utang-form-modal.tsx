@@ -8,19 +8,27 @@ import { FormModal } from '@/components/shared/form-modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { utangSchema, type UtangInput } from '@/lib/validations/utang'
 import { createUtangAction, updateUtangAction } from '@/actions/utang'
-import { fromCentavos } from '@/lib/utils/currency'
-import type { UtangWithProgress } from '@/types'
+import { fromCentavos, formatPHP } from '@/lib/utils/currency'
+import type { UtangWithProgress, FundWithBalance } from '@/types'
 
 type Props = {
   trigger: React.ReactNode
   utang?: UtangWithProgress
+  funds?: FundWithBalance[]
   onSuccess?: () => void
 }
 
-export function UtangFormModal({ trigger, utang: record, onSuccess }: Props) {
+export function UtangFormModal({ trigger, utang: record, funds = [], onSuccess }: Props) {
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const isEdit = !!record
@@ -33,10 +41,12 @@ export function UtangFormModal({ trigger, utang: record, onSuccess }: Props) {
       amount: record ? String(fromCentavos(record.amount)) : '',
       deadline: record?.deadline ?? '',
       note: record?.note ?? '',
+      fundId: record?.fundId ?? undefined,
     },
   })
 
   const selectedType = watch('type')
+  const selectedFundId = watch('fundId')
 
   function onSubmit(data: UtangInput) {
     startTransition(async () => {
@@ -125,6 +135,29 @@ export function UtangFormModal({ trigger, utang: record, onSuccess }: Props) {
               </div>
               {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
             </div>
+
+            {/* Fund Selector for they_owe (Lent from Account) */}
+            {selectedType === 'they_owe' && funds.length > 0 && (!isEdit || !!record?.fundId) && (
+              <div className="space-y-1.5">
+                <Label htmlFor="ut-fund">Lent from Account</Label>
+                <Select
+                  value={selectedFundId ? String(selectedFundId) : ''}
+                  onValueChange={(v) => setValue('fundId', Number(v), { shouldValidate: true })}
+                >
+                  <SelectTrigger id="ut-fund" className="w-full h-10">
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {funds.map((f) => (
+                      <SelectItem key={f.id} value={String(f.id)}>
+                        {f.name} · {formatPHP(f.balance)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.fundId && <p className="text-xs text-destructive">{errors.fundId.message}</p>}
+              </div>
+            )}
 
             {/* Deadline */}
             <div className="space-y-1.5">

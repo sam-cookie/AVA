@@ -107,25 +107,69 @@ export async function createUtang(input: {
   type: 'i_owe' | 'they_owe'
   person: string
   amountRaw: string
+  fundId?: number
   deadline?: string
   note?: string
 }): Promise<ServiceResult<{ utangId: number }>> {
   const amount = toCentavos(input.amountRaw)
   if (amount <= 0) return { success: false, error: 'Amount must be greater than zero' }
 
-  const [row] = await db
-    .insert(utang)
-    .values({
-      type: input.type,
-      person: input.person.trim(),
-      amount,
-      deadline: input.deadline || null,
-      note: input.note?.trim() || null,
-      createdAt: new Date(),
-    })
-    .returning({ id: utang.id })
+  if (input.type === 'they_owe') {
+    if (!input.fundId) {
+      return { success: false, error: 'Account is required when lending money' }
+    }
+    const fund = await db.select().from(funds).where(eq(funds.id, input.fundId)).get()
+    if (!fund) {
+      return { success: false, error: 'Account not found' }
+    }
+    const balance = await getFundBalance(input.fundId)
+    if (balance < amount) {
+      return {
+        success: false,
+        error: `Insufficient balance in ${fund.name}. Available: ${formatPHP(balance)}`,
+      }
+    }
+  }
 
-  return { success: true, data: { utangId: row.id } }
+  const now = new Date()
+  const rowId = await db.transaction(async (tx) => {
+    let txId: number | null = null
+    if (input.type === 'they_owe' && input.fundId) {
+      const todayStr = now.toISOString().slice(0, 10)
+      const [txRow] = await tx
+        .insert(transactions)
+        .values({
+          fundId: input.fundId,
+          type: 'expense',
+          amount,
+          title: `Lent money to ${input.person.trim()}`,
+          category: 'Utang',
+          date: todayStr,
+          note: input.note?.trim() || null,
+          createdAt: now,
+        })
+        .returning({ id: transactions.id })
+      txId = txRow.id
+    }
+
+    const [row] = await tx
+      .insert(utang)
+      .values({
+        type: input.type,
+        person: input.person.trim(),
+        amount,
+        deadline: input.deadline || null,
+        note: input.note?.trim() || null,
+        fundId: input.fundId || null,
+        transactionId: txId,
+        createdAt: now,
+      })
+      .returning({ id: utang.id })
+
+    return row.id
+  })
+
+  return { success: true, data: { utangId: rowId } }
 }
 
 export async function updateUtang(
@@ -135,6 +179,7 @@ export async function updateUtang(
     amountRaw?: string
     deadline?: string | null
     note?: string | null
+    fundId?: number | null
   }
 ): Promise<ServiceResult<void>> {
   const record = await db.select().from(utang).where(eq(utang.id, utangId)).get()
@@ -149,8 +194,32 @@ export async function updateUtang(
   }
   if (input.deadline !== undefined) updates.deadline = input.deadline
   if (input.note !== undefined) updates.note = input.note?.trim() || null
+  if (input.fundId !== undefined) updates.fundId = input.fundId
 
-  await db.update(utang).set(updates).where(eq(utang.id, utangId))
+  await db.transaction(async (tx) => {
+    if (record.transactionId) {
+      const txUpdates: Partial<typeof transactions.$inferInsert> = {}
+      if (input.amountRaw !== undefined) {
+        txUpdates.amount = toCentavos(input.amountRaw)
+      }
+      if (input.person !== undefined) {
+        txUpdates.title = `Lent money to ${input.person.trim()}`
+      }
+      if (input.note !== undefined) {
+        txUpdates.note = input.note?.trim() || null
+      }
+      if (input.fundId !== undefined && input.fundId !== null) {
+        txUpdates.fundId = input.fundId
+      }
+
+      if (Object.keys(txUpdates).length > 0) {
+        await tx.update(transactions).set(txUpdates).where(eq(transactions.id, record.transactionId))
+      }
+    }
+
+    await tx.update(utang).set(updates).where(eq(utang.id, utangId))
+  })
+
   return { success: true, data: undefined }
 }
 
@@ -166,6 +235,10 @@ export async function deleteUtang(utangId: number): Promise<ServiceResult<void>>
   const txIds = payments
     .filter((p) => p.transactionId !== null)
     .map((p) => p.transactionId as number)
+
+  if (record.transactionId) {
+    txIds.push(record.transactionId)
+  }
 
   await db.transaction(async (tx) => {
     await tx.delete(utang).where(eq(utang.id, utangId))

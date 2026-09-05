@@ -89,10 +89,12 @@ export function UtangCard({ utang, funds }: Props) {
             <p className="text-base font-bold text-foreground mt-0.5 truncate">{utang.person}</p>
           </div>
           <div className="text-right shrink-0">
-            <p className="text-base font-bold text-foreground">{formatPHP(utang.amount)}</p>
+            <p className={cn("text-base font-bold", isPaid ? "text-green-600 line-through opacity-70" : "text-foreground")}>
+              {formatPHP(utang.remaining)}
+            </p>
             {utang.totalPaid > 0 && (
               <p className="text-xs text-muted-foreground mt-0.5">
-                {formatPHP(utang.remaining)} left
+                of {formatPHP(utang.amount)}
               </p>
             )}
           </div>
@@ -135,11 +137,11 @@ export function UtangCard({ utang, funds }: Props) {
 
         {/* Actions */}
         <div className={cn(
-          'flex items-center gap-2',
-          (utang.totalPaid > 0 || utang.deadline || utang.note) ? 'pt-1 border-t border-border/40' : 'pt-0'
+          'flex flex-col sm:flex-row items-stretch sm:items-center gap-2',
+          (utang.totalPaid > 0 || utang.deadline || utang.note) ? 'pt-2.5 border-t border-border/40' : 'pt-0'
         )}>
           {!isPaid && (
-            <div className="flex-1">
+            <div className="w-full sm:flex-1">
               <PaymentModal
                 utang={utang}
                 funds={funds}
@@ -154,23 +156,30 @@ export function UtangCard({ utang, funds }: Props) {
               />
             </div>
           )}
-          <PaymentHistoryModal utang={utang} />
-          <UtangFormModal
-            utang={utang}
-            trigger={
-              <button className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors">
-                <Pencil className="h-3.5 w-3.5" />
-                Edit
-              </button>
-            }
-          />
-          <button
-            onClick={() => setDeleteOpen(true)}
-            className="flex items-center justify-center h-8 px-3 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors"
-            aria-label="Delete utang"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+            <div className="flex-1 sm:flex-initial">
+              <PaymentHistoryModal utang={utang} />
+            </div>
+            <div className="flex-1 sm:flex-initial">
+              <UtangFormModal
+                utang={utang}
+                funds={funds}
+                trigger={
+                  <button className="w-full flex items-center justify-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors">
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                }
+              />
+            </div>
+            <button
+              onClick={() => setDeleteOpen(true)}
+              className="flex items-center justify-center h-8 px-3 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors shrink-0"
+              aria-label="Delete utang"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 

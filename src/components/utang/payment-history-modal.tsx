@@ -97,7 +97,7 @@ export function PaymentHistoryModal({ utang }: Props) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+        className="w-full sm:w-auto flex items-center justify-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
       >
         <History className="h-3.5 w-3.5" />
         History
