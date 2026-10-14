@@ -25,6 +25,7 @@ import type { FundWithBalance, IncomeSource, Transaction, GoalWithProgress } fro
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SaveToGoalForm } from './save-to-goal-form'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 
 type Props = {
   fund?: FundWithBalance
@@ -39,6 +40,7 @@ type Props = {
 }
 
 export function AddMoneyForm({ fund, funds, sources: initialSources, goals, initialData, transactionId, onSuccess, onClose }: Props) {
+  const { refresh } = useAppRefresh()
   const [mode, setMode] = useState<'income' | 'savings'>('income')
   const [localSources, setLocalSources] = useState(initialSources)
   const [newSourceInput, setNewSourceInput] = useState('')
@@ -76,6 +78,7 @@ export function AddMoneyForm({ fund, funds, sources: initialSources, goals, init
       if (!isEdit) {
         form.reset({ ...addMoneyDefaults, fundId: defaultFundId, date: todayISO() })
       }
+      refresh({ type: 'addition', id: transactionId })
       onSuccess?.()
     } else {
       toast.error(result.error)

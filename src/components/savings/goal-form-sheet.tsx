@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { savingsGoalSchema, type SavingsGoalInput } from '@/lib/validations/savings-goal'
 import { createGoalAction, updateGoalAction } from '@/actions/savings-goals'
 import { fromCentavos } from '@/lib/utils/currency'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { GoalWithProgress } from '@/types'
 
 type Props = {
@@ -21,6 +22,7 @@ type Props = {
 }
 
 export function GoalFormSheet({ trigger, goal, onSuccess }: Props) {
+  const { refresh } = useAppRefresh()
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
 
@@ -53,6 +55,7 @@ export function GoalFormSheet({ trigger, goal, onSuccess }: Props) {
       toast.success(isEdit ? 'Goal updated' : 'Goal created')
       setOpen(false)
       reset()
+      refresh({ type: 'savings-goal', id: goal?.id })
       onSuccess?.()
     })
   }

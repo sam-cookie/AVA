@@ -2,10 +2,10 @@ import { db } from '@/lib/db/client'
 import { ensureInitialized } from '@/lib/db/init'
 ensureInitialized()
 import { utang, utangPayments, funds, transactions } from '@/lib/db/schema'
-import { eq, desc, sql, inArray } from 'drizzle-orm'
+import { eq, desc, sql, inArray, and, isNull, isNotNull } from 'drizzle-orm'
 import type { ServiceResult, UtangWithProgress, UtangStatus, UtangType } from '@/types'
 import { toCentavos, formatPHP } from '@/lib/utils/currency'
-import { getFundBalance } from './funds'
+import { getFundBalance, invalidateFundsCache } from './funds'
 
 function deriveStatus(totalPaid: number, amount: number): UtangStatus {
   if (totalPaid <= 0) return 'unpaid'
@@ -21,7 +21,7 @@ export async function getUtangDeadlinesForMonth(
   const rows = await db
     .select()
     .from(utang)
-    .where(sql`strftime('%Y-%m', ${utang.deadline}) = ${monthStr}`)
+    .where(and(isNull(utang.archivedAt), sql`strftime('%Y-%m', ${utang.deadline}) = ${monthStr}`))
 
   if (rows.length === 0) return []
 
@@ -50,7 +50,69 @@ export async function getUtangDeadlinesForMonth(
 }
 
 export async function getAllUtang(): Promise<UtangWithProgress[]> {
-  const rows = await db.select().from(utang).orderBy(desc(utang.createdAt))
+  const rows = await db
+    .select()
+    .from(utang)
+    .where(isNull(utang.archivedAt))
+    .orderBy(desc(utang.createdAt))
+  if (rows.length === 0) return []
+
+  const utangIds = rows.map((u) => u.id)
+
+  const totals = await db
+    .select({
+      utangId: utangPayments.utangId,
+      total: sql<number>`COALESCE(SUM(${utangPayments.amount}), 0)`,
+    })
+    .from(utangPayments)
+    .where(inArray(utangPayments.utangId, utangIds))
+    .groupBy(utangPayments.utangId)
+
+  const totalMap = new Map(totals.map((t) => [t.utangId, t.total]))
+
+  const allPayments = await db
+    .select({
+      id: utangPayments.id,
+      utangId: utangPayments.utangId,
+      fundId: utangPayments.fundId,
+      transactionId: utangPayments.transactionId,
+      amount: utangPayments.amount,
+      date: utangPayments.date,
+      note: utangPayments.note,
+      createdAt: utangPayments.createdAt,
+      fundName: funds.name,
+    })
+    .from(utangPayments)
+    .leftJoin(funds, eq(utangPayments.fundId, funds.id))
+    .where(inArray(utangPayments.utangId, utangIds))
+    .orderBy(desc(utangPayments.date), desc(utangPayments.createdAt))
+
+  const paymentsMap = new Map<number, typeof allPayments>()
+  for (const p of allPayments) {
+    const list = paymentsMap.get(p.utangId) ?? []
+    list.push(p)
+    paymentsMap.set(p.utangId, list)
+  }
+
+  return rows.map((u) => {
+    const totalPaid = totalMap.get(u.id) ?? 0
+    const remaining = Math.max(0, u.amount - totalPaid)
+    return {
+      ...u,
+      totalPaid,
+      remaining,
+      status: deriveStatus(totalPaid, u.amount),
+      payments: paymentsMap.get(u.id) ?? [],
+    }
+  })
+}
+
+export async function getArchivedUtang(): Promise<UtangWithProgress[]> {
+  const rows = await db
+    .select()
+    .from(utang)
+    .where(isNotNull(utang.archivedAt))
+    .orderBy(desc(utang.archivedAt))
   if (rows.length === 0) return []
 
   const utangIds = rows.map((u) => u.id)
@@ -223,7 +285,26 @@ export async function updateUtang(
   return { success: true, data: undefined }
 }
 
+/** Soft-delete (archive) an utang record */
 export async function deleteUtang(utangId: number): Promise<ServiceResult<void>> {
+  const record = await db.select().from(utang).where(eq(utang.id, utangId)).get()
+  if (!record) return { success: false, error: 'Utang not found' }
+
+  await db.update(utang).set({ archivedAt: new Date() }).where(eq(utang.id, utangId))
+  return { success: true, data: undefined }
+}
+
+/** Restore a previously soft-deleted utang record */
+export async function restoreUtang(utangId: number): Promise<ServiceResult<void>> {
+  const record = await db.select().from(utang).where(eq(utang.id, utangId)).get()
+  if (!record) return { success: false, error: 'Utang not found' }
+
+  await db.update(utang).set({ archivedAt: null }).where(eq(utang.id, utangId))
+  return { success: true, data: undefined }
+}
+
+/** Permanently delete an utang record, payments, and linked transactions (irreversible) */
+export async function deleteUtangForever(utangId: number): Promise<ServiceResult<void>> {
   const record = await db.select().from(utang).where(eq(utang.id, utangId)).get()
   if (!record) return { success: false, error: 'Utang not found' }
 
@@ -241,10 +322,11 @@ export async function deleteUtang(utangId: number): Promise<ServiceResult<void>>
   }
 
   await db.transaction(async (tx) => {
-    await tx.delete(utang).where(eq(utang.id, utangId))
+    await tx.delete(utangPayments).where(eq(utangPayments.utangId, utangId))
     if (txIds.length > 0) {
       await tx.delete(transactions).where(inArray(transactions.id, txIds))
     }
+    await tx.delete(utang).where(eq(utang.id, utangId))
   })
 
   return { success: true, data: undefined }
@@ -325,6 +407,7 @@ export async function recordUtangPayment(input: {
     return paymentRow.id
   })
 
+  invalidateFundsCache()
   return { success: true, data: { paymentId } }
 }
 
@@ -342,5 +425,6 @@ export async function deleteUtangPayment(paymentId: number): Promise<ServiceResu
       await tx.delete(transactions).where(eq(transactions.id, payment.transactionId))
     }
   })
+  invalidateFundsCache()
   return { success: true, data: undefined }
 }

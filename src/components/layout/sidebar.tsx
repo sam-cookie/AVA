@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Receipt, CreditCard, Settings, BarChart3, PanelLeftClose, PanelLeft, Target, Banknote, LogOut, CalendarDays } from 'lucide-react'
+import { Home, Receipt, CreditCard, Settings, BarChart3, PanelLeftClose, PanelLeft, Target, Banknote, LogOut, CalendarDays, Archive } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logoutAction } from '@/actions/auth'
 
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: '/utang', label: 'Utang', icon: Banknote },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/archive', label: 'Archive', icon: Archive },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -74,6 +75,7 @@ export function Sidebar() {
             <Link
               key={href}
               href={href}
+              prefetch={true}
               title={collapsed ? label : undefined}
               className={cn(
                 'flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors duration-100',

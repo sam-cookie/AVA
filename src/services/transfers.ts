@@ -5,7 +5,7 @@ import { funds, transfers, transactions } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 import type { ServiceResult } from '@/types'
 import { toCentavos, formatPHP } from '@/lib/utils/currency'
-import { getFundBalance } from './funds'
+import { getFundBalance, invalidateFundsCache } from './funds'
 
 /** Create a transfer between two funds atomically.
  *  Fee model: transfer_out.amount = amount + fee (source loses both).
@@ -35,9 +35,11 @@ export async function createTransfer(input: {
 
   const fromFund = await db.select().from(funds).where(eq(funds.id, input.fromFundId)).get()
   if (!fromFund) return { success: false, error: 'Source fund not found' }
+  if (fromFund.archivedAt) return { success: false, error: 'Cannot transfer from an archived account' }
 
   const toFund = await db.select().from(funds).where(eq(funds.id, input.toFundId)).get()
   if (!toFund) return { success: false, error: 'Destination fund not found' }
+  if (toFund.archivedAt) return { success: false, error: 'Cannot transfer to an archived account' }
 
   const balance = await getFundBalance(input.fromFundId)
   if (balance < amount + fee) {
@@ -86,6 +88,7 @@ export async function createTransfer(input: {
     return transfer.id
   })
 
+  invalidateFundsCache()
   return { success: true, data: { transferId } }
 }
 
@@ -95,7 +98,7 @@ export async function getTransferById(transferId: number) {
   return row ?? null
 }
 
-/** Delete a transfer and its two linked transaction rows (cascade handles deletion) */
+/** Soft-delete (archive) a transfer and its two linked transaction rows */
 export async function deleteTransfer(transferId: number): Promise<ServiceResult<void>> {
   const transfer = await db.select().from(transfers).where(eq(transfers.id, transferId)).get()
 
@@ -111,7 +114,42 @@ export async function deleteTransfer(transferId: number): Promise<ServiceResult<
     }
   }
 
+  const now = new Date()
+  await db.transaction(async (tx) => {
+    await tx.update(transfers).set({ archivedAt: now }).where(eq(transfers.id, transferId))
+    await tx.update(transactions).set({ archivedAt: now }).where(eq(transactions.transferId, transferId))
+  })
+
+  invalidateFundsCache()
+  return { success: true, data: undefined }
+}
+
+/** Restore a previously soft-deleted transfer and its linked transactions */
+export async function restoreTransfer(transferId: number): Promise<ServiceResult<void>> {
+  const transfer = await db.select().from(transfers).where(eq(transfers.id, transferId)).get()
+  if (!transfer) return { success: false, error: 'Transfer not found' }
+
+  const sourceBalance = await getFundBalance(transfer.fromFundId)
+  if (sourceBalance < transfer.amount + (transfer.fee ?? 0)) {
+    return { success: false, error: 'Cannot restore: source account balance is insufficient' }
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.update(transfers).set({ archivedAt: null }).where(eq(transfers.id, transferId))
+    await tx.update(transactions).set({ archivedAt: null }).where(eq(transactions.transferId, transferId))
+  })
+
+  invalidateFundsCache()
+  return { success: true, data: undefined }
+}
+
+/** Permanently delete a transfer and its linked transactions (irreversible) */
+export async function deleteTransferForever(transferId: number): Promise<ServiceResult<void>> {
+  const transfer = await db.select().from(transfers).where(eq(transfers.id, transferId)).get()
+  if (!transfer) return { success: false, error: 'Transfer not found' }
+
   await db.delete(transfers).where(eq(transfers.id, transferId))
+  invalidateFundsCache()
   return { success: true, data: undefined }
 }
 
@@ -201,5 +239,6 @@ export async function updateTransfer(
       .where(and(eq(transactions.transferId, transferId), eq(transactions.type, 'transfer_in')))
   })
 
+  invalidateFundsCache()
   return { success: true, data: undefined }
 }

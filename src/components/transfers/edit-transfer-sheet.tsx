@@ -20,6 +20,7 @@ import { getTransferByIdAction, updateTransferAction } from '@/actions/transfers
 import { getFundsWithBalancesAction } from '@/actions/funds'
 import { editTransferSchema, type EditTransferValues } from '@/lib/validations/transfer'
 import { fromCentavos } from '@/lib/utils/currency'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { FundWithBalance, TransactionWithFund } from '@/types'
 
 type Props = {
@@ -29,6 +30,7 @@ type Props = {
 }
 
 export function EditTransferSheet({ open, onOpenChange, transaction }: Props) {
+  const { refresh } = useAppRefresh()
   const [loadingTransfer, setLoadingTransfer] = useState(false)
   const [funds, setFunds] = useState<FundWithBalance[]>([])
 
@@ -76,6 +78,7 @@ export function EditTransferSheet({ open, onOpenChange, transaction }: Props) {
     const result = await updateTransferAction(transaction.transferId, values)
     if (result.success) {
       toast.success('Transfer updated')
+      refresh({ type: 'transfer', id: transaction.transferId })
       onOpenChange(false)
     } else {
       toast.error(result.error)

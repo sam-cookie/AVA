@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { utangSchema, type UtangInput } from '@/lib/validations/utang'
 import { createUtangAction, updateUtangAction } from '@/actions/utang'
 import { fromCentavos, formatPHP } from '@/lib/utils/currency'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { UtangWithProgress, FundWithBalance } from '@/types'
 
 type Props = {
@@ -29,6 +30,7 @@ type Props = {
 }
 
 export function UtangFormModal({ trigger, utang: record, funds = [], onSuccess }: Props) {
+  const { refresh } = useAppRefresh()
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const isEdit = !!record
@@ -47,6 +49,7 @@ export function UtangFormModal({ trigger, utang: record, funds = [], onSuccess }
 
   const selectedType = watch('type')
   const selectedFundId = watch('fundId')
+  const selectedFund = funds.find((f) => f.id === Number(selectedFundId))
 
   function onSubmit(data: UtangInput) {
     startTransition(async () => {
@@ -62,6 +65,7 @@ export function UtangFormModal({ trigger, utang: record, funds = [], onSuccess }
       toast.success(isEdit ? 'Utang updated' : 'Utang recorded')
       setOpen(false)
       if (!isEdit) reset()
+      refresh({ type: 'utang', id: record?.id })
       onSuccess?.()
     })
   }
@@ -145,7 +149,9 @@ export function UtangFormModal({ trigger, utang: record, funds = [], onSuccess }
                   onValueChange={(v) => setValue('fundId', Number(v), { shouldValidate: true })}
                 >
                   <SelectTrigger id="ut-fund" className="w-full h-10">
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder="Select account">
+                      {selectedFund ? `${selectedFund.name} · ${formatPHP(selectedFund.balance)}` : null}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {funds.map((f) => (

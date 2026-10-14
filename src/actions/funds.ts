@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { addMoneySchema } from '@/lib/validations/fund'
 import { fundCreateSchema } from '@/lib/validations/fund-create'
-import { addMoneyToFund, createFund, renameFund, deleteFund, getFundsWithBalances } from '@/services/funds'
+import { addMoneyToFund, createFund, renameFund, deleteFund, restoreFund, deleteFundForever, getFundsWithBalances } from '@/services/funds'
 import { todayISO } from '@/lib/utils/date'
 import type { FundWithBalance, ServiceResult } from '@/types'
 
@@ -68,6 +68,22 @@ export async function renameFundAction(
 
 export async function deleteFundAction(fundId: number): Promise<ServiceResult<void>> {
   const result = await deleteFund(fundId)
+  if (!result.success) return result
+
+  revalidatePath('/', 'layout')
+  return { success: true, data: undefined }
+}
+
+export async function restoreFundAction(fundId: number): Promise<ServiceResult<void>> {
+  const result = await restoreFund(fundId)
+  if (!result.success) return result
+
+  revalidatePath('/', 'layout')
+  return { success: true, data: undefined }
+}
+
+export async function deleteFundForeverAction(fundId: number): Promise<ServiceResult<void>> {
+  const result = await deleteFundForever(fundId)
   if (!result.success) return result
 
   revalidatePath('/', 'layout')

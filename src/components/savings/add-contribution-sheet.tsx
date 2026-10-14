@@ -12,6 +12,7 @@ import { contributionSchema, type ContributionInput } from '@/lib/validations/sa
 import { addContributionAction } from '@/actions/savings-goals'
 import { todayISO } from '@/lib/utils/date'
 import { formatPHP } from '@/lib/utils/currency'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { FundWithBalance, GoalWithProgress } from '@/types'
 
 type Props = {
@@ -22,6 +23,7 @@ type Props = {
 }
 
 export function AddContributionSheet({ goal, funds, trigger, onSuccess }: Props) {
+  const { refresh } = useAppRefresh()
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
 
@@ -50,6 +52,7 @@ export function AddContributionSheet({ goal, funds, trigger, onSuccess }: Props)
       toast.success(`Added to ${goal.name}`)
       setOpen(false)
       reset({ goalId: goal.id, fundId: funds[0]?.id, amount: '', date: todayISO() })
+      refresh({ type: 'savings-contribution', id: goal.id })
       onSuccess?.()
     })
   }

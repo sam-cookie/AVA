@@ -24,6 +24,7 @@ import type { Category, FundWithBalance, Transaction } from '@/types'
 import { CategoryIcon } from '@/components/categories/category-icon'
 import { AddCategorySheet } from '@/components/categories/add-category-sheet'
 import { Button } from '@/components/ui/button'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 
 type Props = {
   funds: FundWithBalance[]
@@ -41,6 +42,7 @@ function toFormAmount(centavos: number): string {
 
 export function ExpenseForm({ funds, categories, initialData, transactionId, onSuccess, onClose }: Props) {
   const router = useRouter()
+  const { refresh } = useAppRefresh()
   const [localCategories, setLocalCategories] = useState(categories)
   const isEdit = transactionId != null && initialData != null
 
@@ -74,6 +76,7 @@ export function ExpenseForm({ funds, categories, initialData, transactionId, onS
       if (!isEdit) {
         form.reset({ ...expenseDefaults, fundId: values.fundId, category: values.category, date: todayISO() })
       }
+      refresh({ type: 'expense', id: transactionId })
       onSuccess?.()
     } else {
       toast.error(result.error)

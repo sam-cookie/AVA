@@ -12,6 +12,7 @@ import { addContributionAction } from '@/actions/savings-goals'
 import { numericInputProps } from '@/lib/utils/input'
 import { todayISO } from '@/lib/utils/date'
 import { formatPHP } from '@/lib/utils/currency'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { FundWithBalance, GoalWithProgress } from '@/types'
 
 type Props = {
@@ -22,6 +23,7 @@ type Props = {
 }
 
 export function SaveToGoalForm({ goals, funds, onSuccess, onClose }: Props) {
+  const { refresh } = useAppRefresh()
   const activeGoals = goals.filter((g) => g.percentComplete < 100)
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ContributionInput>({
@@ -42,6 +44,7 @@ export function SaveToGoalForm({ goals, funds, onSuccess, onClose }: Props) {
     }
     const goal = goals.find((g) => g.id === data.goalId)
     toast.success(`Added to ${goal?.name ?? 'goal'}`)
+    refresh({ type: 'savings-goal', id: data.goalId })
     onSuccess?.()
   }
 

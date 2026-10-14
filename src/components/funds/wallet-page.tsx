@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { WalletStack } from './wallet-stack'
 import { AccountPanel } from './account-panel'
 import { AddFundSheet } from './add-fund-sheet'
 import { BalanceHeader } from '@/components/shared/balance-header'
+import { formatPHP } from '@/lib/utils/currency'
+import { cn } from '@/lib/utils'
 import type { FundWithBalance, IncomeSource, TransactionWithFund, Category } from '@/types'
 
 const ease = [0.16, 1, 0.3, 1] as const
@@ -26,6 +28,14 @@ type Props = {
 
 export function WalletPage({ funds, sources, transactions, categories }: Props) {
   const [activeId, setActiveId] = useState<number | null>(funds[0]?.id ?? null)
+
+  useEffect(() => {
+    if (activeId !== null && !funds.some((f) => f.id === activeId)) {
+      setActiveId(funds[0]?.id ?? null)
+    } else if (activeId === null && funds.length > 0) {
+      setActiveId(funds[0].id)
+    }
+  }, [funds, activeId])
 
   const activeFund = funds.find((f) => f.id === activeId) ?? funds[0] ?? null
   const totalBalance = funds.reduce((s, f) => s + f.balance, 0)
@@ -70,34 +80,66 @@ export function WalletPage({ funds, sources, transactions, categories }: Props) 
         </div>
       </motion.div>
 
-      {/* ── Two-column layout on desktop ── */}
-      <motion.div {...section(0.1)} className="md:grid md:grid-cols-[minmax(0,380px)_1fr] md:items-start md:gap-8 space-y-8 md:space-y-0">
+      {/* ── Two-column layout on desktop (lg+), stacked on mobile/tablet ── */}
+      <motion.div
+        {...section(0.1)}
+        className="flex flex-col lg:flex-row items-stretch lg:items-start gap-8"
+      >
+        {/* Left: wallet stack (stable width, shrink-0, sticky on desktop) */}
+        <div className="w-full lg:w-[350px] xl:w-[380px] shrink-0 lg:sticky lg:top-8 self-start space-y-3">
+          {funds.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none lg:hidden">
+              {funds.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setActiveId(f.id)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5',
+                    f.id === activeFund?.id
+                      ? 'bg-foreground text-background font-semibold shadow-xs'
+                      : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
+                  )}
+                >
+                  <span>{f.name}</span>
+                  <span className={cn(
+                    'tabular-nums text-[11px] font-semibold',
+                    f.id === activeFund?.id ? 'text-background/80' : 'text-foreground/75'
+                  )}>
+                    {formatPHP(f.balance)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
 
-        {/* Left: wallet stack */}
-        <div className="space-y-3">
-          <div style={{ perspective: '1000px' }}>
+          <div style={{ perspective: '1000px' }} className="w-full max-w-[400px] mx-auto lg:mx-0">
             <WalletStack
               funds={funds}
               activeId={activeId}
               onSelect={setActiveId}
             />
           </div>
+
           {funds.length > 1 && (
-            <p className="text-[10px] text-muted-foreground/35 md:hidden">
-              Swipe the card to switch accounts
+            <p className="text-[10.5px] text-muted-foreground/45 text-center lg:text-left">
+              <span className="lg:hidden">Tap any card or swipe to switch accounts</span>
+              <span className="hidden lg:inline">Click any card behind to view its details</span>
             </p>
           )}
         </div>
 
-        {/* Right: receipt panel */}
+        {/* Right: receipt panel (flex-1 with min-w-0 to prevent layout blowout) */}
         {activeFund && (
-          <AccountPanel
-            fund={activeFund}
-            sources={sources}
-            transactions={transactions}
-            categories={categories}
-            allFunds={funds}
-          />
+          <div className="flex-1 min-w-0 max-w-2xl w-full">
+            <AccountPanel
+              fund={activeFund}
+              sources={sources}
+              transactions={transactions}
+              categories={categories}
+              allFunds={funds}
+            />
+          </div>
         )}
       </motion.div>
 

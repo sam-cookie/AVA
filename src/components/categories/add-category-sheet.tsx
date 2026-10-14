@@ -12,6 +12,7 @@ import { categorySchema, type CategoryFormValues } from '@/lib/validations/categ
 import { createCategoryAction } from '@/actions/categories'
 import { IconPicker } from './icon-picker'
 import { Plus } from 'lucide-react'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 
 type Props = {
   onCreated?: (name: string) => void
@@ -19,6 +20,7 @@ type Props = {
 }
 
 export function AddCategorySheet({ onCreated, triggerVariant = 'chip' }: Props) {
+  const { refresh } = useAppRefresh()
   const [open, setOpen] = useState(false)
 
   const form = useForm<CategoryFormValues>({
@@ -32,6 +34,7 @@ export function AddCategorySheet({ onCreated, triggerVariant = 'chip' }: Props) 
       toast.success(`${values.name} added`)
       onCreated?.(values.name)
       form.reset({ name: '', icon: 'Tag' })
+      refresh({ type: 'category' })
       setOpen(false)
     } else {
       toast.error(result.error)

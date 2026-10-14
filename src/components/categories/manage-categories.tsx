@@ -12,6 +12,7 @@ import { updateCategoryAction, deleteCategoryAction } from '@/actions/categories
 import { categorySchema, type CategoryFormValues } from '@/lib/validations/category'
 import { CategoryIcon } from './category-icon'
 import { IconPicker } from './icon-picker'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { Category } from '@/types'
 
 type Props = {
@@ -21,6 +22,7 @@ type Props = {
 type EditingState = { id: number; name: string; icon: string } | null
 
 export function ManageCategories({ categories }: Props) {
+  const { refresh } = useAppRefresh()
   const [editing, setEditing] = useState<EditingState>(null)
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -51,6 +53,7 @@ export function ManageCategories({ categories }: Props) {
       toast.success('Category updated')
       setEditing(null)
       form.reset()
+      refresh({ type: 'category', id: editing.id })
     } else {
       toast.error(result.error)
     }
@@ -62,6 +65,7 @@ export function ManageCategories({ categories }: Props) {
     const result = await deleteCategoryAction(confirmId)
     if (result.success) {
       toast.success('Category deleted')
+      refresh({ type: 'category', id: confirmId })
     } else {
       toast.error(result.error)
     }

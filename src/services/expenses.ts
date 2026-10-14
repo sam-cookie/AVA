@@ -5,7 +5,7 @@ import { funds, transactions } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import type { ServiceResult } from '@/types'
 import { toCentavos, formatPHP } from '@/lib/utils/currency'
-import { getFundBalance } from './funds'
+import { getFundBalance, invalidateFundsCache } from './funds'
 
 /** Create a new expense transaction */
 export async function createExpense(input: {
@@ -23,7 +23,10 @@ export async function createExpense(input: {
 
   const fund = await db.select().from(funds).where(eq(funds.id, input.fundId)).get()
   if (!fund) {
-    return { success: false, error: 'Fund not found' }
+    return { success: false, error: 'Account not found' }
+  }
+  if (fund.archivedAt) {
+    return { success: false, error: 'Cannot create expense in an archived account' }
   }
 
   const balance = await getFundBalance(input.fundId)
@@ -34,6 +37,7 @@ export async function createExpense(input: {
     }
   }
 
+  invalidateFundsCache()
   const result = await db
     .insert(transactions)
     .values({
@@ -98,6 +102,7 @@ export async function updateExpense(
     }
   }
 
+  invalidateFundsCache()
   await db
     .update(transactions)
     .set({
@@ -113,7 +118,7 @@ export async function updateExpense(
   return { success: true, data: undefined }
 }
 
-/** Delete an expense */
+/** Soft-delete (archive) an expense */
 export async function deleteExpense(transactionId: number): Promise<ServiceResult<void>> {
   const existing = await db
     .select()
@@ -125,11 +130,16 @@ export async function deleteExpense(transactionId: number): Promise<ServiceResul
     return { success: false, error: 'Expense not found' }
   }
 
-  await db.delete(transactions).where(eq(transactions.id, transactionId))
+  invalidateFundsCache()
+  await db
+    .update(transactions)
+    .set({ archivedAt: new Date() })
+    .where(eq(transactions.id, transactionId))
+
   return { success: true, data: undefined }
 }
 
-/** Delete a fund addition */
+/** Soft-delete (archive) a fund addition */
 export async function deleteAddition(transactionId: number): Promise<ServiceResult<void>> {
   const existing = await db
     .select()
@@ -149,6 +159,60 @@ export async function deleteAddition(transactionId: number): Promise<ServiceResu
     }
   }
 
+  invalidateFundsCache()
+  await db
+    .update(transactions)
+    .set({ archivedAt: new Date() })
+    .where(eq(transactions.id, transactionId))
+
+  return { success: true, data: undefined }
+}
+
+/** Restore a previously soft-deleted transaction */
+export async function restoreTransaction(transactionId: number): Promise<ServiceResult<void>> {
+  const existing = await db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.id, transactionId))
+    .get()
+
+  if (!existing) {
+    return { success: false, error: 'Transaction not found' }
+  }
+
+  // If restoring an expense, verify the fund has enough balance
+  if (existing.type === 'expense') {
+    const balance = await getFundBalance(existing.fundId)
+    if (balance < existing.amount) {
+      return {
+        success: false,
+        error: 'Cannot restore: account balance is insufficient',
+      }
+    }
+  }
+
+  invalidateFundsCache()
+  await db
+    .update(transactions)
+    .set({ archivedAt: null })
+    .where(eq(transactions.id, transactionId))
+
+  return { success: true, data: undefined }
+}
+
+/** Permanently delete a transaction (irreversible) */
+export async function deleteTransactionForever(transactionId: number): Promise<ServiceResult<void>> {
+  const existing = await db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.id, transactionId))
+    .get()
+
+  if (!existing) {
+    return { success: false, error: 'Transaction not found' }
+  }
+
+  invalidateFundsCache()
   await db.delete(transactions).where(eq(transactions.id, transactionId))
   return { success: true, data: undefined }
 }
@@ -187,6 +251,7 @@ export async function updateAddition(
     }
   }
 
+  invalidateFundsCache()
   await db
     .update(transactions)
     .set({

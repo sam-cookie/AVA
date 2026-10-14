@@ -1,9 +1,9 @@
 'use client'
-
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { formatPHP } from '@/lib/utils/currency'
 import { getDayTransactionsAction } from '@/actions/calendar'
+import { useAppMutationListener } from '@/lib/state/app-refresh'
 import { cn } from '@/lib/utils'
 import type { TransactionWithFund, UtangType } from '@/types'
 
@@ -25,8 +25,11 @@ type Props = {
   onOpenChange: (open: boolean) => void
 }
 
-const WEEKDAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
 
 function formatDate(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number)
@@ -38,7 +41,7 @@ export function DayDetailSheet({ date, expenseTotal, expenseCount, utangDues, op
   const [transactions, setTransactions] = useState<TransactionWithFund[]>([])
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
+  const fetchDayTransactions = useCallback(() => {
     if (!open) return
     setLoading(true)
     getDayTransactionsAction(date).then((txs) => {
@@ -46,6 +49,19 @@ export function DayDetailSheet({ date, expenseTotal, expenseCount, utangDues, op
       setLoading(false)
     })
   }, [open, date])
+
+  useEffect(() => {
+    fetchDayTransactions()
+  }, [fetchDayTransactions])
+
+  // Re-fetch transactions whenever any mutation occurs in the app while sheet is open
+  useAppMutationListener(
+    useCallback(() => {
+      if (open) {
+        fetchDayTransactions()
+      }
+    }, [open, fetchDayTransactions])
+  )
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

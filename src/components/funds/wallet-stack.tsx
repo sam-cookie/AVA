@@ -7,8 +7,9 @@ import { formatPHP } from '@/lib/utils/currency'
 import { AddFundSheet } from './add-fund-sheet'
 import type { FundWithBalance } from '@/types'
 
-const CARD_H = 196
-const PEEK = 26
+const HERO_H = 184
+const LAYER_H = 68
+const TUCK = 14
 
 type Material = {
   bg: string
@@ -41,7 +42,7 @@ function getMaterial(name: string, index: number): Material {
 
 type CardProps = {
   fund: FundWithBalance
-  index: number // position in the ordered array; 0 = active/front
+  index: number // 0 = active/front
   total: number
   onClick: () => void
   onSwipe?: (deltaX: number) => void
@@ -86,9 +87,10 @@ function WalletCard({ fund, index, total, onClick, onSwipe }: CardProps) {
     if (Math.abs(delta) > 50) onSwipe?.(delta)
   }, [isActive, onSwipe])
 
-  const translateY = index * PEEK
-  const scale = 1 - index * 0.04
-  const brightness = 1 - index * 0.1
+  const y = isActive ? 0 : HERO_H - TUCK + (index - 1) * LAYER_H
+  const cardHeight = isActive ? HERO_H : LAYER_H + TUCK
+  const zIndex = total + 10 - index
+  const brightness = Math.max(0.72, 1 - index * 0.05)
 
   return (
     <motion.div
@@ -99,18 +101,18 @@ function WalletCard({ fund, index, total, onClick, onSwipe }: CardProps) {
         top: 0,
         left: 0,
         right: 0,
-        zIndex: total - index,
+        zIndex,
         rotateX: isActive ? rotX : 0,
         rotateY: isActive ? rotY : 0,
         transformStyle: 'preserve-3d',
       }}
-      animate={{ y: translateY, scale, filter: `brightness(${brightness})` }}
+      animate={{ y, height: cardHeight, filter: `brightness(${brightness})` }}
       whileHover={
         isActive
-          ? { y: translateY - 6, scale: scale * 1.015 }
-          : { y: translateY - 10, scale }
+          ? { y: y - 4 }
+          : { y: y - 5, filter: 'brightness(0.97)' }
       }
-      transition={{ type: 'spring', stiffness: 340, damping: 32 }}
+      transition={{ type: 'spring', stiffness: 350, damping: 32 }}
       onClick={onClick}
       onMouseMove={onMouseMove}
       onMouseLeave={onMouseLeave}
@@ -123,20 +125,17 @@ function WalletCard({ fund, index, total, onClick, onSwipe }: CardProps) {
       <div
         style={{
           background: bg,
-          borderRadius: '18px',
-          height: CARD_H,
+          borderRadius: isActive ? '18px' : '16px',
+          height: '100%',
           boxShadow: isActive
-            ? '0 8px 32px rgba(0,0,0,0.32), 0 2px 8px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.10)'
-            : '0 2px 12px rgba(0,0,0,0.20)',
+            ? '0 12px 36px -6px rgba(0,0,0,0.40), 0 4px 12px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.15)'
+            : '0 6px 20px -3px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.18)',
           position: 'relative',
           overflow: 'hidden',
-          padding: '22px 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
           color: '#fff',
           userSelect: 'none',
         }}
+        className="border border-white/16 flex flex-col justify-end"
       >
         {/* Subtle gloss overlay */}
         <div
@@ -144,40 +143,99 @@ function WalletCard({ fund, index, total, onClick, onSwipe }: CardProps) {
             position: 'absolute',
             inset: 0,
             background:
-              'radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.07) 0%, transparent 60%)',
+              'radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.08) 0%, transparent 65%)',
             borderRadius: 'inherit',
             pointerEvents: 'none',
           }}
         />
 
-        {/* Top row */}
-        <div className="flex items-center justify-between">
-          <Icon style={{ color: subtle }} className="h-[15px] w-[15px]" strokeWidth={1.5} />
-          <span
-            style={{ color: subtle }}
-            className="text-[9px] font-bold tracking-[0.22em] uppercase"
-          >
-            {label}
-          </span>
-        </div>
+        {isActive ? (
+          /* ── Full Active Hero Card Layout ── */
+          <div className="h-full flex flex-col justify-between p-5">
+            {/* Top row */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded-md bg-white/14 flex items-center justify-center shrink-0">
+                  <Icon style={{ color: subtle }} className="h-3.5 w-3.5" strokeWidth={1.75} />
+                </div>
+                <span
+                  style={{ color: subtle }}
+                  className="text-[9.5px] font-bold tracking-[0.2em] uppercase"
+                >
+                  {label}
+                </span>
+              </div>
+            </div>
 
-        {/* Bottom row */}
-        <div className="flex items-end justify-between">
-          <div>
-            <p style={{ color: subtle }} className="text-[8.5px] font-semibold tracking-[0.18em] uppercase mb-1.5">
-              Balance
-            </p>
-            <p className="balance-number text-[22px] font-bold leading-none text-white">
-              {formatPHP(fund.balance)}
-            </p>
+            {/* Middle: Account Name */}
+            <div className="my-auto py-1">
+              <p
+                title={fund.name}
+                className="text-[20px] sm:text-[22px] font-bold text-white tracking-tight truncate leading-tight"
+              >
+                {fund.name}
+              </p>
+              <p style={{ color: subtle }} className="text-[9.5px] font-medium tracking-widest uppercase mt-0.5">
+                Personal Account
+              </p>
+            </div>
+
+            {/* Bottom row: Balance */}
+            <div className="flex items-end justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p style={{ color: subtle }} className="text-[8.5px] font-semibold tracking-[0.18em] uppercase mb-1">
+                  Available Balance
+                </p>
+                <p className="balance-number text-[24px] sm:text-[26px] font-bold leading-none text-white tabular-nums truncate">
+                  {formatPHP(fund.balance)}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                {(fund.totalSpent > 0 || fund.totalAdded > 0) && (
+                  <p
+                    style={{ color: subtle }}
+                    className="text-[9.5px] font-medium tracking-wide tabular-nums"
+                  >
+                    {fund.totalSpent > 0
+                      ? `−${formatPHP(fund.totalSpent)}`
+                      : `+${formatPHP(fund.totalAdded)}`}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
-          <span
-            style={{ color: subtle }}
-            className="text-[10px] font-semibold tracking-[0.14em] uppercase"
-          >
-            {fund.name}
-          </span>
-        </div>
+        ) : (
+          /* ── Inactive Stacked Card Layer (Guaranteed 68px visible, never overlapped) ── */
+          <div className="h-[68px] mt-auto flex items-center justify-between px-4 sm:px-5 gap-3 w-full">
+            {/* Left: Brand Icon + Account Name + Type Badge */}
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="h-9 w-9 rounded-xl bg-white/16 border border-white/25 flex items-center justify-center shrink-0 shadow-xs">
+                <Icon className="h-4 w-4 text-white" strokeWidth={2} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p
+                  title={fund.name}
+                  className="text-[13.5px] font-bold text-white tracking-wide truncate leading-tight"
+                >
+                  {fund.name}
+                </p>
+                <span className="inline-block text-[9.5px] font-semibold text-white/70 uppercase tracking-wider mt-0.5 leading-tight">
+                  {label}
+                </span>
+              </div>
+            </div>
+
+            {/* Right: Balance */}
+            <div className="shrink-0 text-right pl-2">
+              <p className="text-[9px] font-semibold text-white/50 uppercase tracking-wider mb-0.5">
+                Balance
+              </p>
+              <p className="balance-number text-[15px] sm:text-[16px] font-bold text-white tabular-nums tracking-tight leading-none">
+                {formatPHP(fund.balance)}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   )
@@ -196,8 +254,7 @@ export function WalletStack({ funds, activeId, onSelect }: Props) {
     ...funds.filter((f) => f.id !== activeId),
   ].filter(Boolean) as FundWithBalance[]
 
-  const peekSlots = ordered.length // add-card slot
-  const containerH = CARD_H + peekSlots * PEEK
+  const stackHeight = ordered.length <= 1 ? HERO_H : HERO_H + (ordered.length - 1) * LAYER_H
 
   function handleSwipe(deltaX: number) {
     const currentIdx = ordered.findIndex((f) => f.id === activeId)
@@ -211,38 +268,35 @@ export function WalletStack({ funds, activeId, onSelect }: Props) {
   }
 
   return (
-    <div style={{ position: 'relative', height: containerH }} className="select-none">
-      {/* Fund cards — render back to front */}
-      {[...ordered].reverse().map((fund, reverseIdx) => {
-        const stackIdx = ordered.length - 1 - reverseIdx
-        return (
+    <div className="w-full select-none">
+      {/* Cards stack container with exact calculated height — zero overflow */}
+      <div style={{ position: 'relative', height: stackHeight }} className="w-full">
+        {ordered.map((fund, index) => (
           <WalletCard
             key={fund.id}
             fund={fund}
-            index={stackIdx}
+            index={index}
             total={ordered.length}
-            onClick={() => { if (stackIdx > 0) onSelect(fund.id) }}
+            onClick={() => { if (index > 0) onSelect(fund.id) }}
             onSwipe={handleSwipe}
           />
-        )
-      })}
+        ))}
+      </div>
 
-      {/* Add card slot */}
-      <motion.button
+      {/* Add account button — cleanly below the entire stack without overlap */}
+      <button
         type="button"
         onClick={() => setAddOpen(true)}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 0, height: CARD_H }}
-        animate={{ y: peekSlots * PEEK, scale: 1 - peekSlots * 0.04 }}
-        whileHover={{ y: peekSlots * PEEK - 8 }}
-        transition={{ type: 'spring', stiffness: 340, damping: 32 }}
-        className="w-full rounded-[18px] border-2 border-dashed border-border/50 flex items-center justify-center gap-2 text-muted-foreground/50 hover:text-muted-foreground hover:border-border transition-colors"
+        className="w-full mt-3.5 h-12 rounded-2xl border-2 border-dashed border-border/70 hover:border-primary/60 text-muted-foreground/65 hover:text-primary transition-all duration-200 bg-card/40 hover:bg-card/70 flex items-center justify-center gap-2.5 cursor-pointer shadow-2xs select-none"
         aria-label="Add account"
       >
-        <Plus className="h-4 w-4" />
-        <span className="text-[12px] font-medium tracking-wide">Add account</span>
-      </motion.button>
+        <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center">
+          <Plus className="h-3.5 w-3.5" />
+        </div>
+        <span className="text-[12px] font-semibold tracking-wide">Add account</span>
+      </button>
 
-      {/* Modal owned here so the card slot can open it without lifting state */}
+      {/* Modal owned here so the button can open it */}
       <AddFundSheet open={addOpen} onOpenChange={setAddOpen} trigger={<></>} />
     </div>
   )

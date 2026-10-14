@@ -1,4 +1,4 @@
-import { db } from './client'
+import { db, client } from './client'
 import { sources, categories, funds } from './schema'
 import { sql } from 'drizzle-orm'
 
@@ -14,6 +14,26 @@ export function ensureInitialized(): void {
 const OLD_FUND_NAMES = ['Allowance', 'Regalo', 'Others', '[Rename] Allowance', '[Rename] Regalo', '[Rename] Others']
 
 async function init() {
+  // Ensure archived_at column exists on all tables (idempotent migration check)
+  const tables = [
+    'funds',
+    'transactions',
+    'transfers',
+    'categories',
+    'sources',
+    'savings_goals',
+    'goal_contributions',
+    'utang',
+    'utang_payments',
+  ]
+  for (const table of tables) {
+    try {
+      await client.execute(`ALTER TABLE ${table} ADD COLUMN archived_at integer`)
+    } catch {
+      // Column already exists or table not yet created
+    }
+  }
+
   // Remove incorrectly-named funds that have no transactions
   for (const name of OLD_FUND_NAMES) {
     await db.run(

@@ -14,20 +14,59 @@ import { SavingsPreview } from '@/components/savings/savings-preview'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { CalendarDays } from 'lucide-react'
+import { toISO, todayISO, currentMonthRange } from '@/lib/utils/date'
+import { getMonday, shiftDays } from '@/lib/utils/period'
 
 export default async function DashboardPage() {
-  const year = new Date().getFullYear()
+  const now = new Date()
+  const year = now.getFullYear()
+  const todayStr = todayISO()
+  const monday = getMonday(now)
+  const sunday = shiftDays(monday, 6)
+  const weekFrom = toISO(monday)
+  const weekTo = toISO(sunday)
+  const { from: monthFrom, to: monthTo } = currentMonthRange()
+
   const [funds, totalBalance, categories, sources, txs, goals] = await Promise.all([
     getFundsWithBalances(),
     getTotalBalance(),
     getCategories(),
     getAllSources(),
-    getTransactions({ dateFrom: `${year}-01-01`, dateTo: `${year}-12-31` }, 1000, 0),
+    getTransactions({ dateFrom: `${year}-01-01`, dateTo: `${year}-12-31` }, 2000, 0),
     getAllGoals(),
   ])
 
+  // Period-filtered additions and expenses
+  const todayReceived = txs
+    .filter((t) => t.date === todayStr && t.type === 'addition')
+    .reduce((s, t) => s + t.amount, 0)
+  const todaySpent = txs
+    .filter((t) => t.date === todayStr && t.type === 'expense')
+    .reduce((s, t) => s + t.amount, 0)
+
+  const weekReceived = txs
+    .filter((t) => t.date >= weekFrom && t.date <= weekTo && t.type === 'addition')
+    .reduce((s, t) => s + t.amount, 0)
+  const weekSpent = txs
+    .filter((t) => t.date >= weekFrom && t.date <= weekTo && t.type === 'expense')
+    .reduce((s, t) => s + t.amount, 0)
+
+  const monthReceived = txs
+    .filter((t) => t.date >= monthFrom && t.date <= monthTo && t.type === 'addition')
+    .reduce((s, t) => s + t.amount, 0)
+  const monthSpent = txs
+    .filter((t) => t.date >= monthFrom && t.date <= monthTo && t.type === 'expense')
+    .reduce((s, t) => s + t.amount, 0)
+
   const totalReceived = funds.reduce((s, f) => s + f.totalAdded, 0)
   const totalSpent = funds.reduce((s, f) => s + f.totalSpent, 0)
+
+  const periodStats = {
+    today: { received: todayReceived, spent: todaySpent },
+    week: { received: weekReceived, spent: weekSpent },
+    month: { received: monthReceived, spent: monthSpent },
+    all: { received: totalReceived, spent: totalSpent },
+  }
 
   return (
     <div className="space-y-8 pb-6">
@@ -53,6 +92,8 @@ export default async function DashboardPage() {
           total={totalBalance}
           received={totalReceived}
           spent={totalSpent}
+          periodStats={periodStats}
+          initialPeriod="all"
           subtext={funds.length > 0 ? `${funds.length} account${funds.length !== 1 ? 's' : ''} · Updated just now` : 'Updated just now'}
         />
 

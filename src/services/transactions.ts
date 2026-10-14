@@ -2,20 +2,20 @@ import { db, client } from '@/lib/db/client'
 import { ensureInitialized } from '@/lib/db/init'
 ensureInitialized()
 import { transactions, funds, transfers } from '@/lib/db/schema'
-import { and, desc, eq, gte, inArray, like, lte } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, isNotNull, isNull, like, lte } from 'drizzle-orm'
 import type {
   TransactionFilters,
   TransactionWithFund,
   TransactionWithRunningBalance,
 } from '@/types'
 
-/** Get a paginated list of transactions with fund name and related fund name for transfers */
+/** Get a paginated list of active transactions with fund name and related fund name for transfers */
 export async function getTransactions(
   filters: TransactionFilters = {},
   limit = 50,
   offset = 0
 ): Promise<TransactionWithFund[]> {
-  const conditions = []
+  const conditions = [isNull(transactions.archivedAt)]
 
   if (filters.fundId) {
     conditions.push(eq(transactions.fundId, filters.fundId))
@@ -51,12 +51,13 @@ export async function getTransactions(
       transferId: transactions.transferId,
       date: transactions.date,
       note: transactions.note,
+      archivedAt: transactions.archivedAt,
       createdAt: transactions.createdAt,
       fundName: funds.name,
     })
     .from(transactions)
     .innerJoin(funds, eq(funds.id, transactions.fundId))
-    .where(conditions.length ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(desc(transactions.date), desc(transactions.createdAt))
     .limit(limit)
     .offset(offset)
@@ -135,6 +136,7 @@ export async function getFundTransactionsWithBalance(
         t.transfer_id as transferId,
         t.date,
         t.note,
+        t.archived_at as archivedAt,
         t.created_at as createdAt,
         f.name as fundName,
         CASE
@@ -152,7 +154,7 @@ export async function getFundTransactionsWithBalance(
       LEFT JOIN transfers tr ON tr.id = t.transfer_id
       LEFT JOIN funds tf_to ON tf_to.id = tr.to_fund_id
       LEFT JOIN funds tf_from ON tf_from.id = tr.from_fund_id
-      WHERE t.fund_id = ?
+      WHERE t.fund_id = ? AND t.archived_at IS NULL
       ORDER BY t.date DESC, t.created_at DESC
     `,
     args: [fundId],
@@ -169,6 +171,7 @@ export async function getFundTransactionsWithBalance(
     transferId: r.transferId as number | null,
     date: r.date as string,
     note: r.note as string | null,
+    archivedAt: r.archivedAt ? new Date((r.archivedAt as number) * 1000) : null,
     createdAt: new Date((r.createdAt as number) * 1000),
     fundName: r.fundName as string,
     relatedFundName: r.relatedFundName as string | null,
@@ -191,6 +194,7 @@ export async function getMonthlyExpenseTotals(
         SUM(amount) as total
       FROM transactions
       WHERE type = 'expense'
+        AND archived_at IS NULL
         AND date >= ?
       GROUP BY month
       ORDER BY month ASC
@@ -207,6 +211,7 @@ export async function getCurrentMonthSpend(): Promise<number> {
       SELECT COALESCE(SUM(amount), 0) as total
       FROM transactions
       WHERE type = 'expense'
+        AND archived_at IS NULL
         AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')
     `,
     args: [],
@@ -226,6 +231,7 @@ export async function getExpensesByCategory(
         SUM(amount) as total
       FROM transactions
       WHERE type = 'expense'
+        AND archived_at IS NULL
         AND date >= ?
         AND date <= ?
       GROUP BY category
@@ -249,6 +255,7 @@ export async function getExpensesByFund(
       FROM transactions t
       INNER JOIN funds f ON f.id = t.fund_id
       WHERE t.type = 'expense'
+        AND t.archived_at IS NULL
         AND t.date >= ?
         AND t.date <= ?
       GROUP BY t.fund_id
@@ -259,7 +266,7 @@ export async function getExpensesByFund(
   return result.rows.map((r) => ({ fundName: r.fundName as string, total: r.total as number }))
 }
 
-/** Daily expense totals for the last N days (only days with spending are returned) */
+/** Daily expense totals for the last N days */
 export async function getDailyExpenseTotals(
   days: number
 ): Promise<{ date: string; total: number }[]> {
@@ -271,6 +278,7 @@ export async function getDailyExpenseTotals(
     sql: `SELECT date, SUM(amount) as total
        FROM transactions
        WHERE type = 'expense'
+         AND archived_at IS NULL
          AND date >= ?
        GROUP BY date
        ORDER BY date DESC`,
@@ -284,7 +292,7 @@ export async function getExpenseTotalForRange(dateFrom: string, dateTo: string):
   const result = await client.execute({
     sql: `SELECT COALESCE(SUM(amount), 0) as total
        FROM transactions
-       WHERE type = 'expense' AND date >= ? AND date <= ?`,
+       WHERE type = 'expense' AND archived_at IS NULL AND date >= ? AND date <= ?`,
     args: [dateFrom, dateTo],
   })
   return result.rows[0].total as number
@@ -295,13 +303,13 @@ export async function getExpenseCountForRange(dateFrom: string, dateTo: string):
   const result = await client.execute({
     sql: `SELECT COUNT(*) as count
        FROM transactions
-       WHERE type = 'expense' AND date >= ? AND date <= ?`,
+       WHERE type = 'expense' AND archived_at IS NULL AND date >= ? AND date <= ?`,
     args: [dateFrom, dateTo],
   })
   return result.rows[0].count as number
 }
 
-/** Expense totals by category with category icon, joined from categories table */
+/** Expense totals by category with category icon */
 export async function getExpensesByCategoryWithIcon(
   dateFrom: string,
   dateTo: string
@@ -313,7 +321,7 @@ export async function getExpensesByCategoryWithIcon(
          SUM(t.amount) as total
        FROM transactions t
        LEFT JOIN categories c ON c.name = t.category
-       WHERE t.type = 'expense' AND t.date >= ? AND t.date <= ?
+       WHERE t.type = 'expense' AND t.archived_at IS NULL AND t.date >= ? AND t.date <= ?
        GROUP BY t.category
        ORDER BY total DESC`,
     args: [dateFrom, dateTo],
@@ -334,7 +342,7 @@ export async function getDailyExpensesForMonth(
   const result = await client.execute({
     sql: `SELECT date, SUM(amount) as total, COUNT(*) as count
           FROM transactions
-          WHERE type = 'expense' AND strftime('%Y-%m', date) = ?
+          WHERE type = 'expense' AND archived_at IS NULL AND strftime('%Y-%m', date) = ?
           GROUP BY date
           ORDER BY date ASC`,
     args: [monthStr],
@@ -349,7 +357,7 @@ export async function getDailyExpensesForMonth(
 /** All-time total of expenses */
 export async function getTotalExpenses(): Promise<number> {
   const result = await client.execute({
-    sql: `SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = 'expense'`,
+    sql: `SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = 'expense' AND archived_at IS NULL`,
     args: [],
   })
   return result.rows[0].total as number
@@ -359,8 +367,37 @@ export async function getTotalExpenses(): Promise<number> {
 export async function getCurrentMonthExpenseCount(): Promise<number> {
   const result = await client.execute({
     sql: `SELECT COUNT(*) as count FROM transactions
-       WHERE type = 'expense' AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')`,
+       WHERE type = 'expense' AND archived_at IS NULL AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')`,
     args: [],
   })
   return result.rows[0].count as number
+}
+
+/** Get all archived transactions */
+export async function getArchivedTransactions(): Promise<TransactionWithFund[]> {
+  const rows = await db
+    .select({
+      id: transactions.id,
+      fundId: transactions.fundId,
+      type: transactions.type,
+      amount: transactions.amount,
+      title: transactions.title,
+      category: transactions.category,
+      source: transactions.source,
+      transferId: transactions.transferId,
+      date: transactions.date,
+      note: transactions.note,
+      archivedAt: transactions.archivedAt,
+      createdAt: transactions.createdAt,
+      fundName: funds.name,
+    })
+    .from(transactions)
+    .innerJoin(funds, eq(funds.id, transactions.fundId))
+    .where(isNotNull(transactions.archivedAt))
+    .orderBy(desc(transactions.archivedAt))
+
+  return rows.map((r) => ({
+    ...r,
+    relatedFundName: null,
+  })) as TransactionWithFund[]
 }

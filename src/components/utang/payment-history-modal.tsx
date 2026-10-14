@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { formatPHP } from '@/lib/utils/currency'
 import { formatDate } from '@/lib/utils/date'
 import { deletePaymentAction } from '@/actions/utang'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import { cn } from '@/lib/utils'
 import type { UtangWithProgress } from '@/types'
 
@@ -18,6 +19,7 @@ type Props = {
 type PaymentItem = UtangWithProgress['payments'][number]
 
 function PaymentRow({ payment, onDelete }: { payment: PaymentItem; onDelete: (id: number) => void }) {
+  const { refresh } = useAppRefresh()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -29,6 +31,7 @@ function PaymentRow({ payment, onDelete }: { payment: PaymentItem; onDelete: (id
         toast.error(result.error)
       } else {
         toast.success('Payment removed')
+        refresh({ type: 'utang-payment', id: payment.id })
         setDeleteOpen(false)
         onDelete(payment.id)
       }

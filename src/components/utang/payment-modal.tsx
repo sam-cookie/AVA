@@ -19,6 +19,7 @@ import { utangPaymentSchema, type UtangPaymentInput } from '@/lib/validations/ut
 import { recordPaymentAction } from '@/actions/utang'
 import { formatPHP, fromCentavos } from '@/lib/utils/currency'
 import { todayISO } from '@/lib/utils/date'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { FundWithBalance, UtangWithProgress } from '@/types'
 
 type Props = {
@@ -29,6 +30,7 @@ type Props = {
 }
 
 export function PaymentModal({ trigger, utang, funds, onSuccess }: Props) {
+  const { refresh } = useAppRefresh()
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
 
@@ -56,6 +58,7 @@ export function PaymentModal({ trigger, utang, funds, onSuccess }: Props) {
       toast.success('Payment recorded')
       setOpen(false)
       reset()
+      refresh({ type: 'utang-payment', id: utang.id })
       onSuccess?.()
     })
   }

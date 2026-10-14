@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { updateSourceAction, deleteSourceAction } from '@/actions/sources'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { IncomeSource } from '@/types'
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
 }
 
 export function SourcesManager({ sources }: Props) {
+  const { refresh } = useAppRefresh()
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingName, setEditingName] = useState('')
   const [confirmId, setConfirmId] = useState<number | null>(null)
@@ -37,6 +39,7 @@ export function SourcesManager({ sources }: Props) {
     if (result.success) {
       toast.success('Source updated')
       setEditingId(null)
+      refresh({ type: 'source', id: editingId })
     } else {
       toast.error(result.error)
     }
@@ -49,6 +52,7 @@ export function SourcesManager({ sources }: Props) {
     const result = await deleteSourceAction(confirmId)
     if (result.success) {
       toast.success('Source deleted')
+      refresh({ type: 'source', id: confirmId })
     } else {
       toast.error(result.error)
     }

@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { UtangFormModal } from './utang-form-modal'
 import { PaymentModal } from './payment-modal'
 import { PaymentHistoryModal } from './payment-history-modal'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { UtangWithProgress, FundWithBalance } from '@/types'
 
 type Props = {
@@ -58,14 +59,20 @@ function StatusBadge({ status }: { status: UtangWithProgress['status'] }) {
 }
 
 export function UtangCard({ utang, funds }: Props) {
+  const { refresh } = useAppRefresh()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, startDelete] = useTransition()
 
   function handleDelete() {
     startDelete(async () => {
       const result = await deleteUtangAction(utang.id)
-      if (!result.success) toast.error(result.error)
-      else { toast.success('Deleted'); setDeleteOpen(false) }
+      if (!result.success) {
+        toast.error(result.error)
+      } else {
+        toast.success('Deleted')
+        refresh({ type: 'utang', id: utang.id })
+        setDeleteOpen(false)
+      }
     })
   }
 

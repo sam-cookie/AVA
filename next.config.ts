@@ -20,6 +20,12 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  experimental: {
+    staleTimes: {
+      dynamic: 30, // Keep dynamic pages in client-side router cache for 30 seconds for instant navigation
+      static: 180, // 3 minutes for static
+    },
+  },
   async headers() {
     return [
       {

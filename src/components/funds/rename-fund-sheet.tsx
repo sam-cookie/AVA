@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { fundCreateSchema, type FundCreateFormValues } from '@/lib/validations/fund-create'
 import { renameFundAction } from '@/actions/funds'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { Fund } from '@/types'
 
 type Props = {
@@ -23,6 +24,7 @@ type Props = {
 }
 
 export function RenameFundSheet({ fund, open, onOpenChange }: Props) {
+  const { refresh } = useAppRefresh()
   const form = useForm<FundCreateFormValues>({
     resolver: standardSchemaResolver(fundCreateSchema),
     defaultValues: { name: fund.name },
@@ -32,6 +34,7 @@ export function RenameFundSheet({ fund, open, onOpenChange }: Props) {
     const result = await renameFundAction(fund.id, values.name)
     if (result.success) {
       toast.success('Account renamed')
+      refresh({ type: 'fund', id: fund.id })
       onOpenChange(false)
     } else {
       toast.error(result.error)

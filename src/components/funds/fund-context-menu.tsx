@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Pencil, Archive } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { deleteFundAction } from '@/actions/funds'
 import { RenameFundSheet } from './rename-fund-sheet'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { Fund } from '@/types'
 
 type Props = {
@@ -19,6 +20,7 @@ type Props = {
 }
 
 export function FundContextMenu({ fund }: Props) {
+  const { refresh } = useAppRefresh()
   const [renameOpen, setRenameOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -27,7 +29,8 @@ export function FundContextMenu({ fund }: Props) {
     setDeleting(true)
     const result = await deleteFundAction(fund.id)
     if (result.success) {
-      toast.success(`${fund.name} deleted`)
+      toast.success(`${fund.name} moved to Archive`)
+      refresh({ type: 'fund', id: fund.id })
     } else {
       toast.error(result.error)
     }
@@ -50,8 +53,8 @@ export function FundContextMenu({ fund }: Props) {
             className="text-destructive focus:text-destructive"
             onClick={() => setTimeout(() => setConfirmOpen(true), 0)}
           >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
+            <Archive className="h-4 w-4 mr-2" />
+            Close Account
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -61,8 +64,9 @@ export function FundContextMenu({ fund }: Props) {
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title={`Delete ${fund.name}?`}
-        description="This cannot be undone. Only accounts with no transactions can be deleted."
+        title={`Close ${fund.name}?`}
+        description="This account will be moved to the Archive. All historical transactions, transfers, and balances are preserved. You can restore it or permanently delete it within 30 days."
+        confirmLabel="Move to Archive"
         onConfirm={handleDelete}
         loading={deleting}
       />

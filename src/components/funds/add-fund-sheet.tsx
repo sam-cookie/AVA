@@ -13,6 +13,7 @@ import { fundCreateSchema, type FundCreateFormValues } from '@/lib/validations/f
 import { createFundAction } from '@/actions/funds'
 import { numericInputProps } from '@/lib/utils/input'
 import { Plus, Pipette } from 'lucide-react'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 
 const PRESETS = [
   '#003699',
@@ -36,6 +37,7 @@ type Props = {
 }
 
 export function AddFundSheet({ open: controlledOpen, onOpenChange, trigger }: Props = {}) {
+  const { refresh } = useAppRefresh()
   const [internalOpen, setInternalOpen] = useState(false)
   const [selectedColor, setSelectedColor] = useState<string | null>(null)
   const open = controlledOpen ?? internalOpen
@@ -62,6 +64,7 @@ export function AddFundSheet({ open: controlledOpen, onOpenChange, trigger }: Pr
     const result = await createFundAction({ ...values, color: selectedColor })
     if (result.success) {
       toast.success(`${values.name} account added`)
+      refresh({ type: 'fund' })
       handleClose()
     } else {
       toast.error(result.error)

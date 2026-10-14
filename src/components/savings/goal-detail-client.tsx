@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { deleteContributionAction } from '@/actions/savings-goals'
 import { formatPHP } from '@/lib/utils/currency'
 import { formatDate, formatShortDate } from '@/lib/utils/date'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { GoalWithContributions, FundWithBalance } from '@/types'
 
 type Props = {
@@ -19,6 +20,7 @@ type Props = {
 type ContribRow = GoalWithContributions['contributions'][number]
 
 function ContributionItem({ contrib, goalId }: { contrib: ContribRow; goalId: number }) {
+  const { refresh } = useAppRefresh()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, startDelete] = useTransition()
 
@@ -30,6 +32,7 @@ function ContributionItem({ contrib, goalId }: { contrib: ContribRow; goalId: nu
         return
       }
       toast.success('Contribution removed')
+      refresh({ type: 'savings-contribution', id: contrib.id })
       setDeleteOpen(false)
     })
   }

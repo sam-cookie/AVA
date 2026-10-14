@@ -1,11 +1,11 @@
-
+import Link from 'next/link'
 import { getCategories } from '@/services/categories'
 import { getAllSources } from '@/services/sources'
 import { ManageCategories } from '@/components/categories/manage-categories'
 import { AddCategorySheet } from '@/components/categories/add-category-sheet'
 import { SourcesManager } from '@/components/shared/sources-manager'
 import { logoutAction } from '@/actions/auth'
-import { LogOut } from 'lucide-react'
+import { Archive, ChevronRight, LogOut } from 'lucide-react'
 
 function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -40,6 +40,27 @@ export default async function SettingsPage() {
 
         <Section title="Income Sources">
           <SourcesManager sources={sources} />
+        </Section>
+
+        <Section title="Data & Storage">
+          <Link
+            href="/settings/archive"
+            prefetch={true}
+            className="flex items-center justify-between p-1 group hover:text-foreground transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <Archive className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Archive</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  View and restore deleted accounts, transactions, and categories within 30 days
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
+          </Link>
         </Section>
 
         <form action={logoutAction} className="md:hidden">

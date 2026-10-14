@@ -4,6 +4,7 @@ export const funds = sqliteTable('funds', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   color: text('color'), // hex color chosen by user, e.g. '#003699'
+  archivedAt: integer('archived_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
@@ -19,6 +20,7 @@ export const transfers = sqliteTable('transfers', {
   fee: integer('fee').notNull().default(0),
   date: text('date').notNull(),
   note: text('note'),
+  archivedAt: integer('archived_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
@@ -39,6 +41,7 @@ export const transactions = sqliteTable('transactions', {
   }),
   date: text('date').notNull(),
   note: text('note'),
+  archivedAt: integer('archived_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 }, (t) => ({
   fundIdIdx: index('idx_transactions_fund_id').on(t.fundId),
@@ -51,12 +54,14 @@ export const categories = sqliteTable('categories', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   icon: text('icon').notNull(),
+  archivedAt: integer('archived_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
 export const sources = sqliteTable('sources', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
+  archivedAt: integer('archived_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
@@ -66,6 +71,7 @@ export const savingsGoals = sqliteTable('savings_goals', {
   targetAmount: integer('target_amount').notNull(), // centavos
   targetDate: text('target_date'), // YYYY-MM-DD, nullable
   note: text('note'),
+  archivedAt: integer('archived_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
@@ -81,6 +87,7 @@ export const goalContributions = sqliteTable('goal_contributions', {
   amount: integer('amount').notNull(), // centavos
   date: text('date').notNull(),
   note: text('note'),
+  archivedAt: integer('archived_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 }, (t) => ({
   goalIdIdx: index('idx_goal_contributions_goal_id').on(t.goalId),
@@ -97,6 +104,7 @@ export const utang = sqliteTable('utang', {
     .references(() => funds.id),
   transactionId: integer('transaction_id')
     .references(() => transactions.id, { onDelete: 'cascade' }),
+  archivedAt: integer('archived_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
@@ -112,6 +120,7 @@ export const utangPayments = sqliteTable('utang_payments', {
   amount: integer('amount').notNull(), // centavos
   date: text('date').notNull(),
   note: text('note'),
+  archivedAt: integer('archived_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 }, (t) => ({
   utangIdIdx: index('idx_utang_payments_utang_id').on(t.utangId),

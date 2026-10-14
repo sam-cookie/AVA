@@ -2,10 +2,10 @@ import { db } from '@/lib/db/client'
 import { ensureInitialized } from '@/lib/db/init'
 ensureInitialized()
 import { savingsGoals, goalContributions, transactions, funds } from '@/lib/db/schema'
-import { eq, desc, sql, inArray } from 'drizzle-orm'
+import { eq, desc, sql, inArray, isNull, isNotNull } from 'drizzle-orm'
 import type { ServiceResult, GoalWithProgress, GoalWithContributions } from '@/types'
 import { toCentavos, formatPHP } from '@/lib/utils/currency'
-import { getFundBalance } from './funds'
+import { getFundBalance, invalidateFundsCache } from './funds'
 
 function computeProgress(savedAmount: number, targetAmount: number) {
   const pct = targetAmount > 0 ? Math.min(100, Math.round((savedAmount / targetAmount) * 100)) : 0
@@ -13,7 +13,39 @@ function computeProgress(savedAmount: number, targetAmount: number) {
 }
 
 export async function getAllGoals(): Promise<GoalWithProgress[]> {
-  const rows = await db.select().from(savingsGoals).orderBy(desc(savingsGoals.createdAt))
+  const rows = await db
+    .select()
+    .from(savingsGoals)
+    .where(isNull(savingsGoals.archivedAt))
+    .orderBy(desc(savingsGoals.createdAt))
+
+  if (rows.length === 0) return []
+
+  const goalIds = rows.map((g) => g.id)
+  const totals = await db
+    .select({
+      goalId: goalContributions.goalId,
+      total: sql<number>`COALESCE(SUM(${goalContributions.amount}), 0)`,
+    })
+    .from(goalContributions)
+    .where(inArray(goalContributions.goalId, goalIds))
+    .groupBy(goalContributions.goalId)
+
+  const totalMap = new Map(totals.map((t) => [t.goalId, t.total]))
+
+  return rows.map((g) => {
+    const saved = totalMap.get(g.id) ?? 0
+    return { ...g, savedAmount: saved, ...computeProgress(saved, g.targetAmount) }
+  })
+}
+
+export async function getArchivedGoals(): Promise<GoalWithProgress[]> {
+  const rows = await db
+    .select()
+    .from(savingsGoals)
+    .where(isNotNull(savingsGoals.archivedAt))
+    .orderBy(desc(savingsGoals.archivedAt))
+
   if (rows.length === 0) return []
 
   const goalIds = rows.map((g) => g.id)
@@ -124,7 +156,26 @@ export async function updateSavingsGoal(
   return { success: true, data: undefined }
 }
 
+/** Soft-delete (archive) a savings goal */
 export async function deleteSavingsGoal(goalId: number): Promise<ServiceResult<void>> {
+  const goal = await db.select().from(savingsGoals).where(eq(savingsGoals.id, goalId)).get()
+  if (!goal) return { success: false, error: 'Goal not found' }
+
+  await db.update(savingsGoals).set({ archivedAt: new Date() }).where(eq(savingsGoals.id, goalId))
+  return { success: true, data: undefined }
+}
+
+/** Restore a previously soft-deleted savings goal */
+export async function restoreSavingsGoal(goalId: number): Promise<ServiceResult<void>> {
+  const goal = await db.select().from(savingsGoals).where(eq(savingsGoals.id, goalId)).get()
+  if (!goal) return { success: false, error: 'Goal not found' }
+
+  await db.update(savingsGoals).set({ archivedAt: null }).where(eq(savingsGoals.id, goalId))
+  return { success: true, data: undefined }
+}
+
+/** Permanently delete a savings goal (irreversible) */
+export async function deleteSavingsGoalForever(goalId: number): Promise<ServiceResult<void>> {
   const goal = await db.select().from(savingsGoals).where(eq(savingsGoals.id, goalId)).get()
   if (!goal) return { success: false, error: 'Goal not found' }
 
@@ -138,10 +189,11 @@ export async function deleteSavingsGoal(goalId: number): Promise<ServiceResult<v
     .map((c) => c.transactionId as number)
 
   await db.transaction(async (tx) => {
-    await tx.delete(savingsGoals).where(eq(savingsGoals.id, goalId))
+    await tx.delete(goalContributions).where(eq(goalContributions.goalId, goalId))
     if (txIds.length > 0) {
       await tx.delete(transactions).where(inArray(transactions.id, txIds))
     }
+    await tx.delete(savingsGoals).where(eq(savingsGoals.id, goalId))
   })
 
   return { success: true, data: undefined }
@@ -162,6 +214,7 @@ export async function addContribution(input: {
 
   const fund = await db.select().from(funds).where(eq(funds.id, input.fundId)).get()
   if (!fund) return { success: false, error: 'Account not found' }
+  if (fund.archivedAt) return { success: false, error: 'Cannot contribute from an archived account' }
 
   const balance = await getFundBalance(input.fundId)
   if (balance < amount) {
@@ -204,6 +257,7 @@ export async function addContribution(input: {
     return contribRow.id
   })
 
+  invalidateFundsCache()
   return { success: true, data: { contributionId } }
 }
 
@@ -221,5 +275,6 @@ export async function deleteContribution(contributionId: number): Promise<Servic
       await tx.delete(transactions).where(eq(transactions.id, contrib.transactionId))
     }
   })
+  invalidateFundsCache()
   return { success: true, data: undefined }
 }

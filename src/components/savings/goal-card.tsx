@@ -11,6 +11,7 @@ import { GoalFormSheet } from './goal-form-sheet'
 import { AddContributionSheet } from './add-contribution-sheet'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { deleteGoalAction } from '@/actions/savings-goals'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import type { GoalWithProgress, FundWithBalance } from '@/types'
 
 type Props = {
@@ -19,6 +20,7 @@ type Props = {
 }
 
 export function GoalCard({ goal, funds }: Props) {
+  const { refresh } = useAppRefresh()
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, startDelete] = useTransition()
@@ -31,6 +33,7 @@ export function GoalCard({ goal, funds }: Props) {
         return
       }
       toast.success('Goal deleted')
+      refresh({ type: 'savings-goal', id: goal.id })
       setDeleteOpen(false)
     })
   }

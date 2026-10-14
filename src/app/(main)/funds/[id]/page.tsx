@@ -1,4 +1,3 @@
-
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getFundWithBalanceById, getFundsWithBalances } from '@/services/funds'
@@ -7,6 +6,7 @@ import { getCategories } from '@/services/categories'
 import { getAllSources } from '@/services/sources'
 import { formatPHP } from '@/lib/utils/currency'
 import { AddMoneySheet } from '@/components/funds/add-money-sheet'
+import { ArchivedFundBanner } from '@/components/funds/archived-fund-banner'
 import { TransactionList } from '@/components/transactions/transaction-list'
 import { ChevronLeft, Smartphone, Building2, Leaf, Banknote, CreditCard } from 'lucide-react'
 
@@ -38,18 +38,24 @@ export default async function FundDetailPage({ params }: Props) {
   if (!fund) notFound()
 
   const { bg, Icon } = getBrand(fund.name)
+  const isArchived = Boolean(fund.archivedAt)
 
   return (
     <div className="space-y-8 pb-24 md:pb-8">
 
       {/* Back link */}
       <Link
-        href="/funds"
+        href={isArchived ? '/archive' : '/funds'}
         className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/60 hover:text-foreground transition-colors"
       >
         <ChevronLeft className="h-3.5 w-3.5" />
-        Accounts
+        {isArchived ? 'Archive' : 'Accounts'}
       </Link>
+
+      {/* Archived banner if account is archived */}
+      {isArchived && (
+        <ArchivedFundBanner fundId={fund.id} fundName={fund.name} />
+      )}
 
       {/* Fund hero */}
       <div className="flex items-start gap-4">
@@ -61,13 +67,13 @@ export default async function FundDetailPage({ params }: Props) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[10px] font-medium text-muted-foreground/65 uppercase tracking-[0.14em]">
-            {fund.name}
+            {fund.name} {isArchived && '(Archived)'}
           </p>
           <p className="balance-number text-[38px] md:text-[46px] font-semibold tabular-nums leading-tight mt-1 text-foreground">
             {formatPHP(fund.balance)}
           </p>
         </div>
-        <AddMoneySheet fund={fund} sources={sources} />
+        {!isArchived && <AddMoneySheet fund={fund} sources={sources} />}
       </div>
 
       {/* Flat stats */}
@@ -110,7 +116,7 @@ export default async function FundDetailPage({ params }: Props) {
             categories={categories}
             funds={allFunds}
             sources={sources}
-            emptyMessage="No activity yet. Add money to get started."
+            emptyMessage={isArchived ? 'No transactions recorded for this archived account.' : 'No activity yet. Add money to get started.'}
           />
         </div>
       </div>

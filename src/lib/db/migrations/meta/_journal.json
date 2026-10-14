@@ -29,6 +29,13 @@
       "when": 1788603223372,
       "tag": "0003_green_lily_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788603300000,
+      "tag": "0004_add_archived_at",
+      "breakpoints": true
     }
   ]
 }

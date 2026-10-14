@@ -12,6 +12,7 @@ export type Fund = {
   id: number
   name: string
   color: string | null
+  archivedAt?: Date | null
   createdAt: Date
 }
 
@@ -19,12 +20,14 @@ export type Category = {
   id: number
   name: string
   icon: string
+  archivedAt?: Date | null
   createdAt: Date
 }
 
 export type IncomeSource = {
   id: number
   name: string
+  archivedAt?: Date | null
   createdAt: Date
 }
 
@@ -39,6 +42,7 @@ export type Transaction = {
   transferId: number | null
   date: string // YYYY-MM-DD
   note: string | null
+  archivedAt?: Date | null
   createdAt: Date
 }
 
@@ -50,6 +54,7 @@ export type Transfer = {
   fee: number // centavos — charged to the source fund on top of amount
   date: string
   note: string | null
+  archivedAt?: Date | null
   createdAt: Date
 }
 
@@ -86,6 +91,7 @@ export type SavingsGoal = {
   targetAmount: number // centavos
   targetDate: string | null // YYYY-MM-DD
   note: string | null
+  archivedAt?: Date | null
   createdAt: Date
 }
 
@@ -97,6 +103,7 @@ export type GoalContribution = {
   amount: number // centavos
   date: string
   note: string | null
+  archivedAt?: Date | null
   createdAt: Date
 }
 
@@ -124,6 +131,7 @@ export type Utang = {
   note: string | null
   fundId?: number | null
   transactionId?: number | null
+  archivedAt?: Date | null
   createdAt: Date
 }
 
@@ -135,6 +143,7 @@ export type UtangPayment = {
   amount: number // centavos
   date: string
   note: string | null
+  archivedAt?: Date | null
   createdAt: Date
 }
 
@@ -155,4 +164,26 @@ export type TransactionFilters = {
   dateFrom?: string
   dateTo?: string
   search?: string
+}
+
+// --- Centralized Archive Types ---
+
+export type ArchiveItemType =
+  | 'account'
+  | 'transaction'
+  | 'savings_goal'
+  | 'category'
+  | 'source'
+  | 'utang'
+
+export type ArchiveItem = {
+  id: number
+  type: ArchiveItemType
+  title: string
+  subtitle?: string | null
+  amount?: number | null // centavos if applicable
+  archivedAt: Date
+  daysRemaining: number
+  expiresAt: Date
+  metadata?: Record<string, unknown>
 }

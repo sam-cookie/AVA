@@ -20,6 +20,7 @@ import { todayISO } from '@/lib/utils/date'
 import type { FundWithBalance } from '@/types'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 
 type Props = {
   funds: FundWithBalance[]
@@ -28,6 +29,7 @@ type Props = {
 }
 
 export function TransferForm({ funds, onSuccess, onClose }: Props) {
+  const { refresh } = useAppRefresh()
   const form = useForm<TransferFormValues>({
     resolver: standardSchemaResolver(transferSchema),
     defaultValues: {
@@ -55,6 +57,7 @@ export function TransferForm({ funds, onSuccess, onClose }: Props) {
     if (result.success) {
       toast.success(`Transferred ${formatPHP(toCentavos(values.amount))} from ${fromFund?.name} → ${toFund?.name}`)
       form.reset({ ...transferDefaults, fromFundId: values.fromFundId, date: todayISO() })
+      refresh({ type: 'transfer' })
       onSuccess?.()
     } else {
       toast.error(result.error)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { MoreHorizontal, Trash2, Pencil, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatPHP } from '@/lib/utils/currency'
@@ -14,6 +14,7 @@ import { EditAdditionSheet } from '@/components/funds/edit-addition-sheet'
 import { EditTransferSheet } from '@/components/transfers/edit-transfer-sheet'
 import { deleteExpenseAction, deleteAdditionAction } from '@/actions/expenses'
 import { deleteTransferAction } from '@/actions/transfers'
+import { useAppRefresh } from '@/lib/state/app-refresh'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,9 +35,15 @@ function typeSign(type: string) {
 
 
 export function ActivityRow({ tx, categories = [], funds = [], sources = [] }: Props) {
+  const { refresh } = useAppRefresh()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [hasEllipsis, setHasEllipsis] = useState(false)
+
+  const titleRef = useRef<HTMLParagraphElement>(null)
+  const noteRef = useRef<HTMLParagraphElement>(null)
 
   const sign = typeSign(tx.type)
   const isTransfer = tx.type === 'transfer_in' || tx.type === 'transfer_out'
@@ -62,6 +69,27 @@ export function ActivityRow({ tx, categories = [], funds = [], sources = [] }: P
       ? 'Transfer'
       : ''
 
+  useEffect(() => {
+    if (expanded) return
+
+    const titleEl = titleRef.current
+    const noteEl = noteRef.current
+    if (!titleEl && !noteEl) return
+
+    const check = () => {
+      const titleOverflow = titleEl ? titleEl.scrollWidth > titleEl.clientWidth + 1 : false
+      const noteOverflow = noteEl ? noteEl.scrollWidth > noteEl.clientWidth + 1 : false
+      setHasEllipsis(titleOverflow || noteOverflow)
+    }
+
+    check()
+
+    const ro = new ResizeObserver(() => check())
+    if (titleEl) ro.observe(titleEl)
+    if (noteEl) ro.observe(noteEl)
+    return () => ro.disconnect()
+  }, [expanded, primaryLabel, tx.note])
+
   async function handleDelete() {
     setDeleting(true)
     let result
@@ -69,17 +97,21 @@ export function ActivityRow({ tx, categories = [], funds = [], sources = [] }: P
     else if (tx.type === 'addition') result = await deleteAdditionAction(tx.id)
     else if (tx.type === 'transfer_out' && tx.transferId) result = await deleteTransferAction(tx.transferId)
     else { setDeleting(false); return }
-    if (result.success) toast.success('Deleted')
-    else toast.error(result.error)
+    if (result.success) {
+      toast.success('Deleted')
+      refresh({ type: tx.type, id: tx.id })
+    } else {
+      toast.error(result.error)
+    }
     setDeleting(false)
     setConfirmOpen(false)
   }
 
   return (
     <>
-      <div className={cn('group flex items-center gap-3 py-3', deleting && 'opacity-40 pointer-events-none')}>
+      <div className={cn('group flex items-start gap-3 py-3', deleting && 'opacity-40 pointer-events-none')}>
         {/* Icon */}
-        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">
           {isTransfer ? (
             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
           ) : catDef ? (
@@ -89,23 +121,99 @@ export function ActivityRow({ tx, categories = [], funds = [], sources = [] }: P
           )}
         </div>
 
-        {/* Label + secondary */}
+        {/* Label + secondary + note */}
         <div className="flex-1 min-w-0">
-          <p className="text-[13.5px] font-medium text-foreground leading-tight truncate">{primaryLabel}</p>
-          {secondaryLabel && (
-            <p className="text-[11px] text-muted-foreground/55 mt-0.5 truncate">{secondaryLabel}</p>
+          {!expanded ? (
+            <div>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <p
+                  ref={titleRef}
+                  title={primaryLabel}
+                  className="text-[13.5px] font-medium text-foreground leading-tight truncate flex-1 min-w-0"
+                >
+                  {primaryLabel}
+                </p>
+                {hasEllipsis && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setExpanded(true)
+                    }}
+                    className="text-[10px] font-semibold text-primary/85 hover:text-primary shrink-0 hover:underline px-1 py-0.5 rounded cursor-pointer leading-none transition-colors"
+                    aria-label="See more details"
+                  >
+                    see more
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                {secondaryLabel && (
+                  <p
+                    title={secondaryLabel}
+                    className="text-[11px] text-muted-foreground/55 truncate shrink-0 max-w-[65%]"
+                  >
+                    {secondaryLabel}
+                  </p>
+                )}
+                {tx.note && (
+                  <>
+                    {secondaryLabel && <span className="text-[10px] text-muted-foreground/35 shrink-0">·</span>}
+                    <p
+                      ref={noteRef}
+                      title={tx.note}
+                      className="text-[11px] text-muted-foreground/45 truncate italic"
+                    >
+                      {tx.note}
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-[13.5px] font-medium text-foreground leading-snug break-words">
+                {primaryLabel}
+              </p>
+              <div className="flex items-center gap-1.5 mt-1 min-w-0 flex-wrap">
+                {secondaryLabel && (
+                  <p className="text-[11px] text-muted-foreground/55 shrink-0">
+                    {secondaryLabel}
+                  </p>
+                )}
+                {tx.note && (
+                  <>
+                    {secondaryLabel && <span className="text-[10px] text-muted-foreground/35 shrink-0">·</span>}
+                    <p className="text-[11px] text-muted-foreground/60 italic break-words">
+                      {tx.note}
+                    </p>
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setExpanded(false)
+                }}
+                className="text-[10px] font-semibold text-muted-foreground/75 hover:text-foreground hover:underline inline-flex items-center gap-0.5 mt-1 cursor-pointer transition-colors"
+                aria-label="See less"
+              >
+                see less
+              </button>
+            </div>
           )}
         </div>
 
         {/* Date + amount (right-aligned stack) */}
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 text-right mt-0.5">
           <p className={cn(
-            'text-[13.5px] font-semibold tabular-nums',
+            'text-[13.5px] font-semibold tabular-nums whitespace-nowrap',
             sign > 0 ? 'text-emerald-600' : 'text-foreground'
           )}>
             {sign > 0 ? '+' : '−'}{formatPHP(tx.amount)}
           </p>
-          <p className="text-[11px] text-muted-foreground/50 mt-0.5">{formatShortDate(tx.date)}</p>
+          <p className="text-[11px] text-muted-foreground/50 mt-0.5 whitespace-nowrap">{formatShortDate(tx.date)}</p>
         </div>
 
         {(canEdit || canDelete) && (
